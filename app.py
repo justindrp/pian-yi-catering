@@ -138,9 +138,14 @@ def edit_dialog(tx_row):
     new_date = st.date_input("Date", value=current_ts.date())
     new_time = st.time_input("Time", value=current_ts.time())
     
-    # Meal Type Edit
-    current_meal = tx_row['meal_type'] if pd.notnull(tx_row['meal_type']) else "Lunch"
-    new_meal = st.radio("Meal Type", ["Lunch", "Dinner"], index=0 if current_meal == "Lunch" else 1, horizontal=True)
+    # Meal Type Edit: Only show if it is a Redemption (negative change)
+    new_meal = None
+    if new_change < 0:
+        current_meal = tx_row['meal_type'] if pd.notnull(tx_row['meal_type']) else "Lunch"
+        new_meal = st.radio("Meal Type", ["Lunch", "Dinner"], index=0 if current_meal == "Lunch" else 1, horizontal=True)
+    else:
+        # If it's a top up, ensure meal_type is None
+        new_meal = None
 
     if st.button("Update"):
         # Combine Date and Time
