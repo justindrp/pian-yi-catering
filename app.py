@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.2.3 (Bug Fix)"
+APP_VERSION = "v1.3.0 (Customer Actions)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -116,6 +116,23 @@ def add_customer(name, phone):
         session.commit()
     st.cache_data.clear()
 
+def update_customer(customer_id, new_name, new_phone):
+    with conn.session as session:
+        session.execute(
+            text("UPDATE customers SET name = :name, phone = :phone WHERE id = :cid"),
+            {"name": new_name, "phone": new_phone, "cid": customer_id}
+        )
+        session.commit()
+    st.cache_data.clear()
+
+def delete_customer(customer_id):
+    with conn.session as session:
+        # Cascade delete (or assume foreign key cascade, but let's be explicit to be safe)
+        session.execute(text("DELETE FROM transactions WHERE customer_id = :cid"), {"cid": customer_id})
+        session.execute(text("DELETE FROM customers WHERE id = :cid"), {"cid": customer_id})
+        session.commit()
+    st.cache_data.clear()
+
 # --- DIALOGS (Modal Popups) ---
 @st.dialog("Edit Transaction")
 def edit_dialog(tx_row):
@@ -207,6 +224,32 @@ def delete_dialog(tx_row):
             st.rerun()
         else:
             st.error("Customer not found.")
+
+@st.dialog("Edit Customer")
+def edit_customer_dialog(row):
+    st.write(f"Editing Customer: {row['name']}")
+    
+    new_name = st.text_input("Name", value=row['name'])
+    new_phone = st.text_input("Phone", value=row['phone'] if pd.notnull(row['phone']) else "")
+    
+    if st.button("Update Customer"):
+        if new_name:
+            update_customer(int(row['id']), new_name, new_phone)
+            st.success("Customer Updated!")
+            st.rerun()
+        else:
+            st.error("Name is required.")
+
+@st.dialog("Delete Customer")
+def delete_customer_dialog(row):
+    st.warning(f"Are you sure you want to DELETE **{row['name']}**?")
+    st.write("⚠️ **Warning**: This will PERMANENTLY delete the customer and **ALL their transactions** (Redemptions, Top Ups).")
+    st.write("This action cannot be undone.")
+    
+    if st.button("Yes, Delete Customer", type="primary"):
+        delete_customer(int(row['id']))
+        st.success(f"Customer {row['name']} deleted.")
+        st.rerun()
 
 def delete_transaction(transaction_id, customer_id, original_change):
     with conn.session as session:
@@ -441,11 +484,32 @@ elif menu_selection == "Manage Customers":
     st.subheader("Customer List")
     customers_df = get_all_customers()
     if not customers_df.empty:
-        st.dataframe(
-            customers_df[['name', 'phone', 'quota_balance', 'created_at']],
-            width="stretch",
-            hide_index=True
-        )
+        # Header
+        h1, h2, h3, h4, h5 = st.columns([1, 3, 2, 2, 2])
+        h1.markdown("**ID**")
+        h2.markdown("**Name**")
+        h3.markdown("**Phone**")
+        h4.markdown("**Quota**")
+        h5.markdown("**Actions**")
+        st.divider()
+        
+        for _, row in customers_df.iterrows():
+            c1, c2, c3, c4, c5 = st.columns([1, 3, 2, 2, 2])
+            c1.write(str(row['id']))
+            c2.write(row['name'])
+            c3.write(row['phone'] if pd.notnull(row['phone']) else "-")
+            c4.write(f"{row['quota_balance']} Portions")
+            
+            with c5:
+                # Use columns for tight button spacing
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("✏️", key=f"edit_cust_{row['id']}", help="Edit Customer"):
+                         edit_customer_dialog(row)
+                with b2:
+                    if st.button("🗑️", key=f"del_cust_{row['id']}", help="Delete Customer"):
+                         delete_customer_dialog(row)
+            st.divider()    
     else:
         st.info("No customers found.")
 
