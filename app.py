@@ -191,7 +191,7 @@ elif menu_selection == "Manage Customers":
     if not customers_df.empty:
         st.dataframe(
             customers_df[['name', 'phone', 'quota_balance', 'created_at']],
-            use_container_width=True,
+            width="stretch",
             hide_index=True
         )
     else:
@@ -206,7 +206,7 @@ elif menu_selection == "Transaction Log":
     if not transactions_df.empty:
         st.dataframe(
             transactions_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True
         )
     else:
