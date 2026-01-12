@@ -100,7 +100,7 @@ st.title("🍱 Pian Yi Catering - Quota Manager")
 
 # Sidbar Navigation
 st.sidebar.title("Navigation")
-menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Manage Customers", "Transaction Log"])
+menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Manage Customers", "Transaction Log", "User Guide"])
 
 # --- A. REDEEM MEAL ---
 if menu_selection == "Redeem Meal":
@@ -234,4 +234,34 @@ elif menu_selection == "Transaction Log":
             hide_index=True
         )
     else:
+    else:
         st.info("No transactions found.")
+
+# --- E. USER GUIDE ---
+elif menu_selection == "User Guide":
+    st.header("📘 User Guide")
+    
+    st.markdown("""
+    ### 1. Redeem Meal 🍽️
+    - Go to **Redeem Meal**.
+    - Select the customer's name.
+    - Click **"Redeem 1 Portion"**.
+    - **Mistake?** If you clicked by accident, an **"Undo Last Redemption"** button will appear. Click it immediately to reverse the change.
+    
+    ### 2. Top Up Quota 💰
+    - Go to **Top Up Quota**.
+    - Select the customer.
+    - Choose a **Package** (e.g., "10 Portions").
+    - The price is auto-calculated based on configuration.
+    - **Edit Price:** You can manually change the **Unit Price** if you are giving a special discount.
+    
+    ### 3. Manage Customers 👥
+    - Go to **Manage Customers**.
+    - Open **"Add New Customer"**.
+    - Enter Name and Phone Number.
+    - Click **"Add Customer"**.
+    
+    ### 4. Transaction Log 📜
+    - Use this to view the history of all Top Ups and Redemptions.
+    - Shows the last 50 transactions.
+    """)
