@@ -59,9 +59,11 @@ except Exception as e:
     st.error(f"Database initialization failed: {e}")
 
 # --- 3. HELPER FUNCTIONS ---
+@st.cache_data
 def get_all_customers():
-    return conn.query("SELECT * FROM customers ORDER BY name ASC", ttl=0)
+    return conn.query("SELECT * FROM customers ORDER BY name ASC")
 
+@st.cache_data
 def get_recent_transactions():
     query = """
     SELECT 
@@ -71,7 +73,7 @@ def get_recent_transactions():
     ORDER BY t.timestamp DESC 
     LIMIT 50
     """
-    return conn.query(query, ttl=0)
+    return conn.query(query)
 
 def update_quota(customer_id, change_amount, payment_amount, note, timestamp=None, meal_type=None):
     if timestamp is None:
@@ -96,6 +98,7 @@ def update_quota(customer_id, change_amount, payment_amount, note, timestamp=Non
             {"cid": customer_id, "change": change_amount}
         )
         session.commit()
+    st.cache_data.clear()
 
 def add_customer(name, phone):
     with conn.session as session:
@@ -104,6 +107,7 @@ def add_customer(name, phone):
             {"name": name, "phone": phone}
         )
         session.commit()
+    st.cache_data.clear()
 
 # --- DIALOGS (Modal Popups) ---
 @st.dialog("Edit Transaction")
@@ -214,6 +218,7 @@ def delete_transaction(transaction_id, customer_id, original_change):
             {"tid": transaction_id}
         )
         session.commit()
+    st.cache_data.clear()
 
 def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pay, new_note, new_timestamp, new_meal_type):
     with conn.session as session:
