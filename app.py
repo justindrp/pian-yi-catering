@@ -99,7 +99,22 @@ def add_customer(name, phone):
 def edit_dialog(tx_row):
     st.write(f"Editing Transaction ID: {tx_row['id']}")
     new_change = st.number_input("Change Amount (+/-)", value=int(tx_row['change_amount']))
-    new_pay = st.number_input("Payment Amount", value=int(tx_row['payment_amount']))
+    
+    # Auto-calculate Payment based on Unit Price if it's a Top Up
+    new_pay = 0
+    if new_change > 0:
+        # Calculate initial unit price safely
+        old_qty = int(tx_row['change_amount'])
+        old_pay = int(tx_row['payment_amount'])
+        initial_unit_price = int(old_pay / old_qty) if old_qty > 0 else 0
+        
+        unit_price = st.number_input("Unit Price (IDR)", value=initial_unit_price, step=500)
+        new_pay = int(new_change * unit_price)
+        st.info(f"**Total Payment:** {new_pay:,.0f} IDR (Auto-calculated)")
+    else:
+        # For redemptions (negative change), usually payment is 0, but allow manual edit if needed
+        new_pay = st.number_input("Payment Amount", value=int(tx_row['payment_amount']))
+        
     new_note = st.text_input("Note", value=tx_row['note'])
     
     if st.button("Update"):
@@ -393,7 +408,7 @@ elif menu_selection == "User Guide":
     - Use this to view the history of all Top Ups and Redemptions.
     - Shows the last 50 transactions.
     - **Edit & Delete**:
-        - Click the **Pencil (✏️)** icon to edit a transaction (amount, payment, note).
+        - Click the **Pencil (✏️)** icon to edit a transaction using **Unit Price** (Total is auto-calculated).
         - Click the **Trash Can (🗑️)** icon to delete a transaction.
         - ⚠️ **Important:** Editing or Deleting will automatically update the customer's Quota Balance!
     """)
