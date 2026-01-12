@@ -392,4 +392,8 @@ elif menu_selection == "User Guide":
     ### 4. Transaction Log 📜
     - Use this to view the history of all Top Ups and Redemptions.
     - Shows the last 50 transactions.
+    - **Edit & Delete**:
+        - Click the **Pencil (✏️)** icon to edit a transaction (amount, payment, note).
+        - Click the **Trash Can (🗑️)** icon to delete a transaction.
+        - ⚠️ **Important:** Editing or Deleting will automatically update the customer's Quota Balance!
     """)
