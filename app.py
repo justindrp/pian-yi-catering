@@ -13,6 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
+APP_VERSION = "v1.2.0 (Latest)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -285,6 +286,8 @@ st.title("🍱 Pian Yi Catering - Quota Manager")
 # Sidbar Navigation
 st.sidebar.title("Navigation")
 menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Manage Customers", "Transaction Log", "Daily Recap", "User Guide"])
+st.sidebar.divider()
+st.sidebar.caption(f"App Version: {APP_VERSION}")
 
 # --- A. REDEEM MEAL ---
 if menu_selection == "Redeem Meal":
