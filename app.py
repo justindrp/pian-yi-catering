@@ -123,10 +123,25 @@ if menu_selection == "Redeem Meal":
             if st.button("Redeem 1 Portion", type="primary"):
                 if current_balance > 0:
                     update_quota(int(customer_data['id']), -1, 0, "Redemption")
+                    # Store last redemption for Undo
+                    st.session_state['last_redemption'] = {
+                        'customer_id': int(customer_data['id']),
+                        'name': selected_name
+                    }
                     st.success(f"Redeemed 1 portion for {selected_name}!")
                     st.rerun()
                 else:
                     st.error("Insufficient balance! Please Top Up.")
+
+        # Undo Functionality
+        if 'last_redemption' in st.session_state:
+            last_red = st.session_state['last_redemption']
+            st.warning(f"Last Action: Redeemed 1 portion for {last_red['name']}")
+            if st.button("↩️ Undo Last Redemption"):
+                update_quota(last_red['customer_id'], 1, 0, "Undo Redemption")
+                del st.session_state['last_redemption']
+                st.info("Redemption undone.")
+                st.rerun()
 
 # --- B. TOP UP QUOTA ---
 elif menu_selection == "Top Up Quota":
@@ -148,7 +163,16 @@ elif menu_selection == "Top Up Quota":
         package_info = PRICING_CONFIG[package_name]
         
         qty = package_info['qty']
-        unit_price = package_info['price']
+        default_unit_price = package_info['price']
+        
+        # Editable Unit Price
+        unit_price = st.number_input(
+            "Unit Price (IDR)", 
+            min_value=0, 
+            value=default_unit_price, 
+            step=500
+        )
+        
         total_price = qty * unit_price
         
         # details
