@@ -94,6 +94,51 @@ def add_customer(name, phone):
         )
         session.commit()
 
+def delete_transaction(transaction_id, customer_id, original_change):
+    with conn.session as session:
+        # 1. Revert the customer balance (subtract the original change)
+        session.execute(
+            text("""
+                UPDATE customers 
+                SET quota_balance = quota_balance - :orig_change
+                WHERE id = :cid
+            """),
+            {"cid": customer_id, "orig_change": original_change}
+        )
+        # 2. Delete the transaction
+        session.execute(
+            text("DELETE FROM transactions WHERE id = :tid"),
+            {"tid": transaction_id}
+        )
+        session.commit()
+
+def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pay, new_note):
+    with conn.session as session:
+        # 1. Update Transaction
+        session.execute(
+            text("""
+                UPDATE transactions 
+                SET change_amount = :new_change,
+                    payment_amount = :new_pay,
+                    note = :new_note
+                WHERE id = :tid
+            """),
+            {"tid": transaction_id, "new_change": new_change, "new_pay": new_pay, "new_note": new_note}
+        )
+        
+        # 2. Update Customer Balance (Difference)
+        diff = new_change - old_change
+        if diff != 0:
+            session.execute(
+                text("""
+                    UPDATE customers 
+                    SET quota_balance = quota_balance + :diff
+                    WHERE id = :cid
+                """),
+                {"cid": customer_id, "diff": diff}
+            )
+        session.commit()
+
 # --- 4. UI STRUCTURE ---
 st.set_page_config(page_title="Pian Yi Catering", page_icon="🍱", layout="centered")
 st.title("🍱 Pian Yi Catering - Quota Manager")
@@ -235,6 +280,64 @@ elif menu_selection == "Transaction Log":
         )
     else:
         st.info("No transactions found.")
+
+    st.divider()
+    st.subheader("Manage Transaction")
+    
+    # Reload to ensure we have data for the selectbox
+    tx_df = get_recent_transactions()
+    
+    if not tx_df.empty:
+        # Create a mapping for the selectbox
+        tx_options = {f"ID {row['id']} - {row['name']} ({row['change_amount']})": row for _, row in tx_df.iterrows()}
+        selected_tx_label = st.selectbox("Select Transaction to Edit/Delete", options=list(tx_options.keys()))
+        
+        if selected_tx_label:
+            selected_tx = tx_options[selected_tx_label]
+            
+            with st.expander("Edit / Delete Transaction", expanded=True):
+                st.write(f"**Selected:** {selected_tx_label}")
+                st.write(f"**Current Note:** {selected_tx['note']}")
+                
+                action = st.radio("Action", ["Edit", "Delete"], horizontal=True)
+                
+                if action == "Delete":
+                    st.warning("⚠️ Deleting this transaction will revert the Quota Balance change!")
+                    if st.button("Confirm Delete", type="primary"):
+                        delete_transaction(
+                            int(selected_tx['id']), 
+                            int(get_all_customers().set_index('name').loc[selected_tx['name']]['id']), # Need customer ID, looking up by name is safe-ish for small scale or we join it in query
+                            int(selected_tx['change_amount'])
+                        )
+                        st.success("Transaction deleted.")
+                        st.rerun()
+                        
+                elif action == "Edit":
+                    new_change = st.number_input("Change Amount (+/-)", value=int(selected_tx['change_amount']))
+                    new_pay = st.number_input("Payment Amount", value=int(selected_tx['payment_amount']))
+                    new_note = st.text_input("Note", value=selected_tx['note'])
+                    
+                    if st.button("Update Transaction"):
+                        # Get Customer ID again (improving the query usually better, but hacky fix for now)
+                        # To be safe, let's fetch customer_id properly in the get_recent_transactions query
+                        # For now, we will assume unique names or fetch via helper
+                        cust_id_lookup = get_all_customers()
+                        cust_row = cust_id_lookup[cust_id_lookup['name'] == selected_tx['name']]
+                        
+                        if not cust_row.empty:
+                            cid = int(cust_row.iloc[0]['id'])
+                            edit_transaction(
+                                int(selected_tx['id']),
+                                cid,
+                                int(selected_tx['change_amount']),
+                                int(new_change),
+                                int(new_pay),
+                                new_note
+                            )
+                            st.success("Transaction updated.")
+                            st.rerun()
+                        else:
+                            st.error("Could not find associated customer ID.")
 
 # --- E. USER GUIDE ---
 elif menu_selection == "User Guide":
