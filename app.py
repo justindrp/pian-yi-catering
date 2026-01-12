@@ -234,7 +234,6 @@ elif menu_selection == "Transaction Log":
             hide_index=True
         )
     else:
-    else:
         st.info("No transactions found.")
 
 # --- E. USER GUIDE ---
