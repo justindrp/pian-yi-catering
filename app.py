@@ -48,8 +48,12 @@ def init_db():
         try:
             session.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS meal_type TEXT;"))
         except Exception:
-            pass # Ignore if error (though IF NOT EXISTS should handle it on Postgres 9.6+)
+            pass # Ignore if error
 
+        # Indexing for Performance
+        session.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_customer_id ON transactions(customer_id);"))
+        session.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_timestamp ON transactions(timestamp);"))
+        
         session.commit()
 
 # Run init_db once on script load (or handle via a separate setup script if preferred, 
@@ -256,6 +260,7 @@ def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pa
                 {"cid": customer_id, "diff": diff}
             )
         session.commit()
+    st.cache_data.clear()
 
 def get_balance_at_timestamp(customer_id, target_timestamp):
     # Calculate balance up to a specific point in time
@@ -267,6 +272,7 @@ def get_balance_at_timestamp(customer_id, target_timestamp):
     result = conn.query(query, params={"cid": customer_id, "ts": target_timestamp}, ttl=0)
     return int(result.iloc[0, 0]) if not result.empty else 0
 
+@st.cache_data
 def get_transactions_by_date(selected_date):
     # Ensure date filtering works regardless of time
     query = """
