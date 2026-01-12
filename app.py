@@ -259,7 +259,7 @@ if menu_selection == "Redeem Meal":
     if customers_df.empty:
         st.warning("No customers found. Please add a customer first.")
     else:
-    else:
+
         customer_options = {row['name']: row for _, row in customers_df.iterrows()}
         selected_name = st.selectbox("Select Customer", options=list(customer_options.keys()))
         
