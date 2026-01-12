@@ -38,9 +38,17 @@ def init_db():
                 change_amount INTEGER,
                 payment_amount INTEGER,
                 note TEXT,
-                timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                meal_type TEXT
             );
         """))
+        
+        # Migration: Add meal_type column if it doesn't exist
+        try:
+            session.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS meal_type TEXT;"))
+        except Exception:
+            pass # Ignore if error (though IF NOT EXISTS should handle it on Postgres 9.6+)
+
         session.commit()
 
 # Run init_db once on script load (or handle via a separate setup script if preferred, 
@@ -57,7 +65,7 @@ def get_all_customers():
 def get_recent_transactions():
     query = """
     SELECT 
-        t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note 
+        t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note, t.meal_type 
     FROM transactions t
     JOIN customers c ON t.customer_id = c.id
     ORDER BY t.timestamp DESC 
@@ -65,7 +73,7 @@ def get_recent_transactions():
     """
     return conn.query(query, ttl=0)
 
-def update_quota(customer_id, change_amount, payment_amount, note, timestamp=None):
+def update_quota(customer_id, change_amount, payment_amount, note, timestamp=None, meal_type=None):
     if timestamp is None:
         timestamp = datetime.now()
         
@@ -73,10 +81,10 @@ def update_quota(customer_id, change_amount, payment_amount, note, timestamp=Non
         # Insert transaction
         session.execute(
             text("""
-                INSERT INTO transactions (customer_id, change_amount, payment_amount, note, timestamp)
-                VALUES (:cid, :change, :pay, :note, :ts)
+                INSERT INTO transactions (customer_id, change_amount, payment_amount, note, timestamp, meal_type)
+                VALUES (:cid, :change, :pay, :note, :ts, :meal)
             """),
-            {"cid": customer_id, "change": change_amount, "pay": payment_amount, "note": note, "ts": timestamp}
+            {"cid": customer_id, "change": change_amount, "pay": payment_amount, "note": note, "ts": timestamp, "meal": meal_type}
         )
         # Update customer balance
         session.execute(
@@ -130,6 +138,10 @@ def edit_dialog(tx_row):
     new_date = st.date_input("Date", value=current_ts.date())
     new_time = st.time_input("Time", value=current_ts.time())
     
+    # Meal Type Edit
+    current_meal = tx_row['meal_type'] if pd.notnull(tx_row['meal_type']) else "Lunch"
+    new_meal = st.radio("Meal Type", ["Lunch", "Dinner"], index=0 if current_meal == "Lunch" else 1, horizontal=True)
+
     if st.button("Update"):
         # Combine Date and Time
         new_timestamp = datetime.combine(new_date, new_time)
@@ -148,7 +160,8 @@ def edit_dialog(tx_row):
                 int(new_change),
                 int(new_pay),
                 new_note,
-                new_timestamp
+                new_timestamp,
+                new_meal
             )
             st.success("Updated!")
             st.rerun()
@@ -197,7 +210,7 @@ def delete_transaction(transaction_id, customer_id, original_change):
         )
         session.commit()
 
-def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pay, new_note, new_timestamp):
+def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pay, new_note, new_timestamp, new_meal_type):
     with conn.session as session:
         # 1. Update Transaction
         session.execute(
@@ -206,7 +219,8 @@ def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pa
                 SET change_amount = :new_change,
                     payment_amount = :new_pay,
                     note = :new_note,
-                    timestamp = :new_ts
+                    timestamp = :new_ts,
+                    meal_type = :new_meal
                 WHERE id = :tid
             """),
             {
@@ -214,7 +228,8 @@ def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pa
                 "new_change": new_change, 
                 "new_pay": new_pay, 
                 "new_note": new_note,
-                "new_ts": new_timestamp
+                "new_ts": new_timestamp,
+                "new_meal": new_meal_type
             }
         )
         
@@ -235,7 +250,7 @@ def get_transactions_by_date(selected_date):
     # Ensure date filtering works regardless of time
     query = """
     SELECT 
-        t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note 
+        t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note, t.meal_type 
     FROM transactions t
     JOIN customers c ON t.customer_id = c.id
     WHERE DATE(t.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') = :selected_date
@@ -276,19 +291,22 @@ if menu_selection == "Redeem Meal":
             # Display Balance
             st.metric(label="Current Quota Balance", value=f"{current_balance} Portions")
             
+            # Meal Type Selection
+            meal_type = st.radio("Meal Type", ["Lunch", "Dinner"], horizontal=True)
+            
             if st.button("Redeem 1 Portion", type="primary"):
                 if current_balance > 0:
                     # Combine selected date with current time for precise logging
                     current_time = datetime.now().time()
                     tx_timestamp = datetime.combine(selected_date, current_time)
                     
-                    update_quota(int(customer_data['id']), -1, 0, "Redemption", tx_timestamp)
+                    update_quota(int(customer_data['id']), -1, 0, "Redemption", tx_timestamp, meal_type)
                     # Store last redemption for Undo
                     st.session_state['last_redemption'] = {
                         'customer_id': int(customer_data['id']),
                         'name': selected_name
                     }
-                    st.success(f"Redeemed 1 portion for {selected_name} on {selected_date}!")
+                    st.success(f"Redeemed 1 {meal_type} portion for {selected_name} on {selected_date}!")
                     st.rerun()
                 else:
                     st.error("Insufficient balance! Please Top Up.")
@@ -405,30 +423,32 @@ elif menu_selection == "Transaction Log":
     transactions_df = get_recent_transactions()
     if not transactions_df.empty:
         # Header Row
-        h1, h2, h3, h4, h5, h6, h7 = st.columns([1, 2, 2, 2, 2, 3, 2])
+        h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([1, 2, 2, 1.5, 1.5, 2, 3, 2])
         h1.markdown("**ID**")
         h2.markdown("**Time**")
         h3.markdown("**Customer**")
-        h4.markdown("**Change**")
-        h5.markdown("**Payment**")
-        h6.markdown("**Note**")
-        h7.markdown("**Actions**")
+        h4.markdown("**Meal**")
+        h5.markdown("**Change**")
+        h6.markdown("**Payment**")
+        h7.markdown("**Note**")
+        h8.markdown("**Actions**")
         
         st.divider()
         
         for _, row in transactions_df.iterrows():
-            c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 2, 2, 2, 2, 3, 2])
+            c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([1, 2, 2, 1.5, 1.5, 2, 3, 2])
             
             c1.write(str(row['id']))
             # Format timestamp if valid
             ts = row['timestamp']
             c2.write(ts.strftime("%Y-%m-%d %H:%M") if pd.notnull(ts) else "-")
             c3.write(row['name'])
-            c4.write(str(row['change_amount']))
-            c5.write(f"{row['payment_amount']:,}")
-            c6.write(row['note'])
+            c4.write(row['meal_type'] if pd.notnull(row['meal_type']) else "-")
+            c5.write(str(row['change_amount']))
+            c6.write(f"{row['payment_amount']:,}")
+            c7.write(row['note'])
             
-            with c7:
+            with c8:
                 # Use columns for tight button spacing
                 b1, b2 = st.columns(2)
                 with b1:
@@ -438,7 +458,7 @@ elif menu_selection == "Transaction Log":
                     if st.button("🗑️", key=f"del_{row['id']}", help="Delete"):
                         delete_dialog(row)
             
-            st.divider()
+            st.divider()    
 
     else:
         st.info("No transactions found.")
@@ -461,13 +481,21 @@ elif menu_selection == "Daily Recap":
         portions_sold = daily_df[daily_df['change_amount'] > 0]['change_amount'].sum()
         
         # Calculate Portions Redeemed - Change Amount < 0
-        portions_redeemed = abs(daily_df[daily_df['change_amount'] < 0]['change_amount'].sum())
+        redemptions = daily_df[daily_df['change_amount'] < 0]
+        portions_redeemed = abs(redemptions['change_amount'].sum())
+        
+        # Breakdown Lunch vs Dinner
+        lunch_redeemed = abs(redemptions[redemptions['meal_type'] == 'Lunch']['change_amount'].sum())
+        dinner_redeemed = abs(redemptions[redemptions['meal_type'] == 'Dinner']['change_amount'].sum())
         
         # Metrics
-        m1, m2, m3 = st.columns(3)
+        m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Revenue", f"{total_revenue:,.0f} IDR")
         m2.metric("Portions Sold", f"{portions_sold}")
-        m3.metric("Portions Redeemed", f"{portions_redeemed}")
+        m3.metric("Lunch", f"{lunch_redeemed}")
+        m4.metric("Dinner", f"{dinner_redeemed}")
+        
+        st.caption(f"Total Redeemed: {portions_redeemed}")
         
         st.divider()
         st.subheader(f"Transactions for {selected_date.strftime('%d %B %Y')}")
@@ -475,7 +503,7 @@ elif menu_selection == "Daily Recap":
         # Re-use the row-based layout or standard dataframe
         # Let's use standard dataframe for compactness here since we aren't editing
         st.dataframe(
-            daily_df[['timestamp', 'name', 'change_amount', 'payment_amount', 'note']],
+            daily_df[['timestamp', 'name', 'meal_type', 'change_amount', 'payment_amount', 'note']],
             width="stretch",
             hide_index=True
         )
@@ -490,6 +518,7 @@ elif menu_selection == "User Guide":
     ### 1. Redeem Meal 🍽️
     - Go to **Redeem Meal**.
     - Select the customer's name.
+    - Choose **Lunch** or **Dinner**.
     - Click **"Redeem 1 Portion"**.
     - **Mistake?** If you clicked by accident, an **"Undo Last Redemption"** button will appear. Click it immediately to reverse the change.
     
@@ -511,6 +540,7 @@ elif menu_selection == "User Guide":
     - Shows the last 50 transactions.
     - **Edit & Delete**:
         - Click the **Pencil (✏️)** icon to edit a transaction using **Unit Price** (Total is auto-calculated).
+        - You can also update the **Date** and **Meal Type** (Lunch/Dinner).
         - Click the **Trash Can (🗑️)** icon to delete a transaction.
         - ⚠️ **Important:** Editing or Deleting will automatically update the customer's Quota Balance!
     """)
