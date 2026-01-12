@@ -418,8 +418,7 @@ elif menu_selection == "Transaction Log":
     else:
         st.info("No transactions found.")
 
-    else:
-        st.info("No transactions found.")
+
 
 # --- E. DAILY RECAP ---
 elif menu_selection == "Daily Recap":
