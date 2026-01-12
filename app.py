@@ -117,7 +117,20 @@ def edit_dialog(tx_row):
         
     new_note = st.text_input("Note", value=tx_row['note'])
     
+    # Date Edit
+    current_ts = tx_row['timestamp']
+    if pd.isna(current_ts):
+        current_ts = datetime.now()
+    elif not isinstance(current_ts, datetime): # Ensure it's a datetime object
+        current_ts = pd.to_datetime(current_ts)
+        
+    new_date = st.date_input("Date", value=current_ts.date())
+    new_time = st.time_input("Time", value=current_ts.time())
+    
     if st.button("Update"):
+        # Combine Date and Time
+        new_timestamp = datetime.combine(new_date, new_time)
+        
         # Fetch customer ID safely
         cust_id_lookup = get_all_customers()
         cust_row = cust_id_lookup[cust_id_lookup['name'] == tx_row['name']]
@@ -131,7 +144,8 @@ def edit_dialog(tx_row):
                 int(tx_row['change_amount']),
                 int(new_change),
                 int(new_pay),
-                new_note
+                new_note,
+                new_timestamp
             )
             st.success("Updated!")
             st.rerun()
@@ -180,7 +194,7 @@ def delete_transaction(transaction_id, customer_id, original_change):
         )
         session.commit()
 
-def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pay, new_note):
+def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pay, new_note, new_timestamp):
     with conn.session as session:
         # 1. Update Transaction
         session.execute(
@@ -188,10 +202,17 @@ def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pa
                 UPDATE transactions 
                 SET change_amount = :new_change,
                     payment_amount = :new_pay,
-                    note = :new_note
+                    note = :new_note,
+                    timestamp = :new_ts
                 WHERE id = :tid
             """),
-            {"tid": transaction_id, "new_change": new_change, "new_pay": new_pay, "new_note": new_note}
+            {
+                "tid": transaction_id, 
+                "new_change": new_change, 
+                "new_pay": new_pay, 
+                "new_note": new_note,
+                "new_ts": new_timestamp
+            }
         )
         
         # 2. Update Customer Balance (Difference)
@@ -207,13 +228,30 @@ def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pa
             )
         session.commit()
 
+def get_transactions_by_date(selected_date):
+    # Ensure date filtering works regardless of time
+    query = text("""
+    SELECT 
+        t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note 
+    FROM transactions t
+    JOIN customers c ON t.customer_id = c.id
+    WHERE DATE(t.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') = :selected_date
+    ORDER BY t.timestamp DESC 
+    """) 
+    # Note: Adjust timezone as needed. Assuming Asia/Jakarta based on IDR currency usage.
+    # If standard UTC is preferred: WHERE DATE(t.timestamp) = :selected_date
+    # Let's stick to simple casting for now, trusting inputs are day-aligned or handling timezone explicitly if needed.
+    # Supabase usually stores in UTC.
+    
+    return conn.query(query, params={"selected_date": selected_date}, ttl=0)
+
 # --- 4. UI STRUCTURE ---
 st.set_page_config(page_title="Pian Yi Catering", page_icon="🍱", layout="centered")
 st.title("🍱 Pian Yi Catering - Quota Manager")
 
 # Sidbar Navigation
 st.sidebar.title("Navigation")
-menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Manage Customers", "Transaction Log", "User Guide"])
+menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Manage Customers", "Transaction Log", "Daily Recap", "User Guide"])
 
 # --- A. REDEEM MEAL ---
 if menu_selection == "Redeem Meal":
@@ -380,7 +418,47 @@ elif menu_selection == "Transaction Log":
     else:
         st.info("No transactions found.")
 
-# --- E. USER GUIDE ---
+    else:
+        st.info("No transactions found.")
+
+# --- E. DAILY RECAP ---
+elif menu_selection == "Daily Recap":
+    st.header("📅 Daily Recap")
+    
+    selected_date = st.date_input("Select Date", value=datetime.now().date())
+    
+    daily_df = get_transactions_by_date(selected_date)
+    
+    if not daily_df.empty:
+        # Calculate Summaries
+        total_revenue = daily_df[daily_df['payment_amount'] > 0]['payment_amount'].sum()
+        
+        # Calculate Portions Sold (Top Ups) - Change Amount > 0
+        portions_sold = daily_df[daily_df['change_amount'] > 0]['change_amount'].sum()
+        
+        # Calculate Portions Redeemed - Change Amount < 0
+        portions_redeemed = abs(daily_df[daily_df['change_amount'] < 0]['change_amount'].sum())
+        
+        # Metrics
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Revenue", f"{total_revenue:,.0f} IDR")
+        m2.metric("Portions Sold", f"{portions_sold}")
+        m3.metric("Portions Redeemed", f"{portions_redeemed}")
+        
+        st.divider()
+        st.subheader(f"Transactions for {selected_date.strftime('%d %B %Y')}")
+        
+        # Re-use the row-based layout or standard dataframe
+        # Let's use standard dataframe for compactness here since we aren't editing
+        st.dataframe(
+            daily_df[['timestamp', 'name', 'change_amount', 'payment_amount', 'note']],
+            width="stretch",
+            hide_index=True
+        )
+    else:
+        st.info(f"No transactions found for {selected_date.strftime('%d %B %Y')}.")
+
+# --- F. USER GUIDE ---
 elif menu_selection == "User Guide":
     st.header("📘 User Guide")
     
