@@ -91,6 +91,7 @@ def add_customer(name, phone):
         session.execute(
             text("INSERT INTO customers (name, phone) VALUES (:name, :phone)"),
             {"name": name, "phone": phone}
+        )
         session.commit()
 
 # --- DIALOGS (Modal Popups) ---
