@@ -266,11 +266,11 @@ def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pa
 
 def get_balance_at_timestamp(customer_id, target_timestamp):
     # Calculate balance up to a specific point in time
-    query = text("""
+    query = """
         SELECT COALESCE(SUM(change_amount), 0) 
         FROM transactions 
         WHERE customer_id = :cid AND timestamp <= :ts
-    """)
+    """
     result = conn.query(query, params={"cid": customer_id, "ts": target_timestamp}, ttl=0)
     return int(result.iloc[0, 0]) if not result.empty else 0
 
