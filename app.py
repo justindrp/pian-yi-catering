@@ -13,12 +13,13 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.2.1 (Performance Optimized)"
+APP_VERSION = "v1.2.2 (Max Performance)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
 conn = st.connection("supabase", type="sql")
 
+@st.cache_resource
 def init_db():
     with conn.session as session:
         # Create customers table
@@ -66,7 +67,7 @@ except Exception as e:
 # --- 3. HELPER FUNCTIONS ---
 @st.cache_data
 def get_all_customers():
-    return conn.query("SELECT * FROM customers ORDER BY name ASC")
+    return conn.query("SELECT * FROM customers ORDER BY name ASC", ttl=0)
 
 @st.cache_data
 def get_recent_transactions():
@@ -78,7 +79,8 @@ def get_recent_transactions():
     ORDER BY t.timestamp DESC 
     LIMIT 50
     """
-    return conn.query(query)
+    # Use ttl=0 to disable connection-level cache, relying on st.cache_data
+    return conn.query(query, ttl=0)
 
 def update_quota(customer_id, change_amount, payment_amount, note, timestamp=None, meal_type=None):
     if timestamp is None:
