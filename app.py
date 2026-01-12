@@ -65,15 +65,18 @@ def get_recent_transactions():
     """
     return conn.query(query, ttl=0)
 
-def update_quota(customer_id, change_amount, payment_amount, note):
+def update_quota(customer_id, change_amount, payment_amount, note, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now()
+        
     with conn.session as session:
         # Insert transaction
         session.execute(
             text("""
-                INSERT INTO transactions (customer_id, change_amount, payment_amount, note)
-                VALUES (:cid, :change, :pay, :note)
+                INSERT INTO transactions (customer_id, change_amount, payment_amount, note, timestamp)
+                VALUES (:cid, :change, :pay, :note, :ts)
             """),
-            {"cid": customer_id, "change": change_amount, "pay": payment_amount, "note": note}
+            {"cid": customer_id, "change": change_amount, "pay": payment_amount, "note": note, "ts": timestamp}
         )
         # Update customer balance
         session.execute(
@@ -230,19 +233,14 @@ def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pa
 
 def get_transactions_by_date(selected_date):
     # Ensure date filtering works regardless of time
-    query = text("""
+    query = """
     SELECT 
         t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note 
     FROM transactions t
     JOIN customers c ON t.customer_id = c.id
     WHERE DATE(t.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') = :selected_date
     ORDER BY t.timestamp DESC 
-    """) 
-    # Note: Adjust timezone as needed. Assuming Asia/Jakarta based on IDR currency usage.
-    # If standard UTC is preferred: WHERE DATE(t.timestamp) = :selected_date
-    # Let's stick to simple casting for now, trusting inputs are day-aligned or handling timezone explicitly if needed.
-    # Supabase usually stores in UTC.
-    
+    """
     return conn.query(query, params={"selected_date": selected_date}, ttl=0)
 
 # --- 4. UI STRUCTURE ---
@@ -261,8 +259,15 @@ if menu_selection == "Redeem Meal":
     if customers_df.empty:
         st.warning("No customers found. Please add a customer first.")
     else:
+    else:
         customer_options = {row['name']: row for _, row in customers_df.iterrows()}
         selected_name = st.selectbox("Select Customer", options=list(customer_options.keys()))
+        
+        # Persistent Date Selection
+        if 'redeem_date' not in st.session_state:
+            st.session_state['redeem_date'] = datetime.now().date()
+            
+        selected_date = st.date_input("Date", key='redeem_date')
         
         if selected_name:
             customer_data = customer_options[selected_name]
@@ -273,13 +278,17 @@ if menu_selection == "Redeem Meal":
             
             if st.button("Redeem 1 Portion", type="primary"):
                 if current_balance > 0:
-                    update_quota(int(customer_data['id']), -1, 0, "Redemption")
+                    # Combine selected date with current time for precise logging
+                    current_time = datetime.now().time()
+                    tx_timestamp = datetime.combine(selected_date, current_time)
+                    
+                    update_quota(int(customer_data['id']), -1, 0, "Redemption", tx_timestamp)
                     # Store last redemption for Undo
                     st.session_state['last_redemption'] = {
                         'customer_id': int(customer_data['id']),
                         'name': selected_name
                     }
-                    st.success(f"Redeemed 1 portion for {selected_name}!")
+                    st.success(f"Redeemed 1 portion for {selected_name} on {selected_date}!")
                     st.rerun()
                 else:
                     st.error("Insufficient balance! Please Top Up.")
@@ -335,9 +344,25 @@ elif menu_selection == "Top Up Quota":
             
         st.metric(label="Total to Pay", value=f"{total_price:,.0f} IDR")
         
+        
+        # Reuse the same date key if we want the "last selected date" to be global across tabs, 
+        # OR use a different key. The user prompt implies a global preference "defaults to the last user-selected date". 
+        # Let's use the SAME session state key 'redeem_date' (maybe rename to 'global_date' in future) for convenience, 
+        # OR just initialize it similarly. Let's use 'redeem_date' as the shared "Transaction Date" for now or create a new one.
+        # Actually, let's use a shared date because "user-selected date" suggests a workflow context.
+        
+        # Ensure key exists
+        if 'redeem_date' not in st.session_state:
+            st.session_state['redeem_date'] = datetime.now().date()
+            
+        selected_date = st.date_input("Date", key='redeem_date') # This will sync with Redeem page
+        
         if st.button("Confirm Purchase"):
-            update_quota(int(selected_customer['id']), qty, total_price, f"Top Up: {package_name}")
-            st.success(f"Successfully added {qty} portions to {selected_name}'s quota!")
+            current_time = datetime.now().time()
+            tx_timestamp = datetime.combine(selected_date, current_time)
+            
+            update_quota(int(selected_customer['id']), qty, total_price, f"Top Up: {package_name}", tx_timestamp)
+            st.success(f"Successfully added {qty} portions to {selected_name}'s quota on {selected_date}!")
             st.rerun()
 
 # --- C. MANAGE CUSTOMERS ---
