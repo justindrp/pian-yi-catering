@@ -246,6 +246,16 @@ def edit_transaction(transaction_id, customer_id, old_change, new_change, new_pa
             )
         session.commit()
 
+def get_balance_at_timestamp(customer_id, target_timestamp):
+    # Calculate balance up to a specific point in time
+    query = text("""
+        SELECT COALESCE(SUM(change_amount), 0) 
+        FROM transactions 
+        WHERE customer_id = :cid AND timestamp <= :ts
+    """)
+    result = conn.query(query, params={"cid": customer_id, "ts": target_timestamp}, ttl=0)
+    return int(result.iloc[0, 0]) if not result.empty else 0
+
 def get_transactions_by_date(selected_date):
     # Ensure date filtering works regardless of time
     query = """
@@ -295,11 +305,14 @@ if menu_selection == "Redeem Meal":
             meal_type = st.radio("Meal Type", ["Lunch", "Dinner"], horizontal=True)
             
             if st.button("Redeem 1 Portion", type="primary"):
-                if current_balance > 0:
-                    # Combine selected date with current time for precise logging
-                    current_time = datetime.now().time()
-                    tx_timestamp = datetime.combine(selected_date, current_time)
-                    
+                # Combine selected date with current time for precise logging
+                current_time = datetime.now().time()
+                tx_timestamp = datetime.combine(selected_date, current_time)
+                
+                # Check balance at that specific moment
+                historical_balance = get_balance_at_timestamp(int(customer_data['id']), tx_timestamp)
+                
+                if historical_balance > 0:
                     update_quota(int(customer_data['id']), -1, 0, "Redemption", tx_timestamp, meal_type)
                     # Store last redemption for Undo
                     st.session_state['last_redemption'] = {
@@ -309,7 +322,7 @@ if menu_selection == "Redeem Meal":
                     st.success(f"Redeemed 1 {meal_type} portion for {selected_name} on {selected_date}!")
                     st.rerun()
                 else:
-                    st.error("Insufficient balance! Please Top Up.")
+                    st.error(f"Insufficient balance! On {selected_date}, the balance was {historical_balance}. Cannot redeem.")
 
         # Undo Functionality
         if 'last_redemption' in st.session_state:
