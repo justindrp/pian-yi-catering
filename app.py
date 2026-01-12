@@ -91,8 +91,60 @@ def add_customer(name, phone):
         session.execute(
             text("INSERT INTO customers (name, phone) VALUES (:name, :phone)"),
             {"name": name, "phone": phone}
-        )
         session.commit()
+
+# --- DIALOGS (Modal Popups) ---
+@st.dialog("Edit Transaction")
+def edit_dialog(tx_row):
+    st.write(f"Editing Transaction ID: {tx_row['id']}")
+    new_change = st.number_input("Change Amount (+/-)", value=int(tx_row['change_amount']))
+    new_pay = st.number_input("Payment Amount", value=int(tx_row['payment_amount']))
+    new_note = st.text_input("Note", value=tx_row['note'])
+    
+    if st.button("Update"):
+        # Fetch customer ID safely
+        cust_id_lookup = get_all_customers()
+        cust_row = cust_id_lookup[cust_id_lookup['name'] == tx_row['name']]
+        
+        if not cust_row.empty:
+            cid = int(cust_row.iloc[0]['id'])
+            # Helper function call
+            edit_transaction(
+                int(tx_row['id']),
+                cid,
+                int(tx_row['change_amount']),
+                int(new_change),
+                int(new_pay),
+                new_note
+            )
+            st.success("Updated!")
+            st.rerun()
+        else:
+            st.error("Customer not found.")
+
+@st.dialog("Confirm Deletion")
+def delete_dialog(tx_row):
+    st.warning(f"Are you sure you want to delete transaction #{tx_row['id']}?")
+    st.write(f"**Customer:** {tx_row['name']}")
+    st.write(f"**Amount:** {tx_row['change_amount']}")
+    st.write("⚠️ This will revert the Quota Balance change.")
+    
+    if st.button("Yes, Delete", type="primary"):
+         # Fetch customer ID safely
+        cust_id_lookup = get_all_customers()
+        cust_row = cust_id_lookup[cust_id_lookup['name'] == tx_row['name']]
+        
+        if not cust_row.empty:
+            cid = int(cust_row.iloc[0]['id'])
+            delete_transaction(
+                int(tx_row['id']), 
+                cid,
+                int(tx_row['change_amount'])
+            )
+            st.success("Deleted.")
+            st.rerun()
+        else:
+            st.error("Customer not found.")
 
 def delete_transaction(transaction_id, customer_id, original_change):
     with conn.session as session:
@@ -273,71 +325,44 @@ elif menu_selection == "Transaction Log":
     
     transactions_df = get_recent_transactions()
     if not transactions_df.empty:
-        st.dataframe(
-            transactions_df,
-            width="stretch",
-            hide_index=True
-        )
+        # Header Row
+        h1, h2, h3, h4, h5, h6, h7 = st.columns([1, 2, 2, 2, 2, 3, 2])
+        h1.markdown("**ID**")
+        h2.markdown("**Time**")
+        h3.markdown("**Customer**")
+        h4.markdown("**Change**")
+        h5.markdown("**Payment**")
+        h6.markdown("**Note**")
+        h7.markdown("**Actions**")
+        
+        st.divider()
+        
+        for _, row in transactions_df.iterrows():
+            c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 2, 2, 2, 2, 3, 2])
+            
+            c1.write(str(row['id']))
+            # Format timestamp if valid
+            ts = row['timestamp']
+            c2.write(ts.strftime("%Y-%m-%d %H:%M") if pd.notnull(ts) else "-")
+            c3.write(row['name'])
+            c4.write(str(row['change_amount']))
+            c5.write(f"{row['payment_amount']:,}")
+            c6.write(row['note'])
+            
+            with c7:
+                # Use columns for tight button spacing
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("✏️", key=f"edit_{row['id']}", help="Edit"):
+                        edit_dialog(row)
+                with b2:
+                    if st.button("🗑️", key=f"del_{row['id']}", help="Delete"):
+                        delete_dialog(row)
+            
+            st.divider()
+
     else:
         st.info("No transactions found.")
-
-    st.divider()
-    st.subheader("Manage Transaction")
-    
-    # Reload to ensure we have data for the selectbox
-    tx_df = get_recent_transactions()
-    
-    if not tx_df.empty:
-        # Create a mapping for the selectbox
-        tx_options = {f"ID {row['id']} - {row['name']} ({row['change_amount']})": row for _, row in tx_df.iterrows()}
-        selected_tx_label = st.selectbox("Select Transaction to Edit/Delete", options=list(tx_options.keys()))
-        
-        if selected_tx_label:
-            selected_tx = tx_options[selected_tx_label]
-            
-            with st.expander("Edit / Delete Transaction", expanded=True):
-                st.write(f"**Selected:** {selected_tx_label}")
-                st.write(f"**Current Note:** {selected_tx['note']}")
-                
-                action = st.radio("Action", ["Edit", "Delete"], horizontal=True)
-                
-                if action == "Delete":
-                    st.warning("⚠️ Deleting this transaction will revert the Quota Balance change!")
-                    if st.button("Confirm Delete", type="primary"):
-                        delete_transaction(
-                            int(selected_tx['id']), 
-                            int(get_all_customers().set_index('name').loc[selected_tx['name']]['id']), # Need customer ID, looking up by name is safe-ish for small scale or we join it in query
-                            int(selected_tx['change_amount'])
-                        )
-                        st.success("Transaction deleted.")
-                        st.rerun()
-                        
-                elif action == "Edit":
-                    new_change = st.number_input("Change Amount (+/-)", value=int(selected_tx['change_amount']))
-                    new_pay = st.number_input("Payment Amount", value=int(selected_tx['payment_amount']))
-                    new_note = st.text_input("Note", value=selected_tx['note'])
-                    
-                    if st.button("Update Transaction"):
-                        # Get Customer ID again (improving the query usually better, but hacky fix for now)
-                        # To be safe, let's fetch customer_id properly in the get_recent_transactions query
-                        # For now, we will assume unique names or fetch via helper
-                        cust_id_lookup = get_all_customers()
-                        cust_row = cust_id_lookup[cust_id_lookup['name'] == selected_tx['name']]
-                        
-                        if not cust_row.empty:
-                            cid = int(cust_row.iloc[0]['id'])
-                            edit_transaction(
-                                int(selected_tx['id']),
-                                cid,
-                                int(selected_tx['change_amount']),
-                                int(new_change),
-                                int(new_pay),
-                                new_note
-                            )
-                            st.success("Transaction updated.")
-                            st.rerun()
-                        else:
-                            st.error("Could not find associated customer ID.")
 
 # --- E. USER GUIDE ---
 elif menu_selection == "User Guide":
