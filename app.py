@@ -693,11 +693,11 @@ elif menu_selection == "Transaction Log":
     
     col_p, col_c, col_n = st.columns([1, 2, 1])
     with col_p:
-        if st.button("<", disabled=(current_page == 1), key="prev_btn", use_container_width=True):
+        if st.button("< Previous", disabled=(current_page == 1), key="prev_btn", use_container_width=True):
              st.session_state['log_page_number'] -= 1
              st.rerun()
     with col_n:
-         if st.button(">", disabled=(current_page == total_pages if total_count > 0 else True), key="next_btn", use_container_width=True):
+         if st.button("Next >", disabled=(current_page == total_pages if total_count > 0 else True), key="next_btn", use_container_width=True):
              st.session_state['log_page_number'] += 1
              st.rerun()
     with col_c:
