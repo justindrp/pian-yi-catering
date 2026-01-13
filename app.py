@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.5.3 (Balanced Footer)"
+APP_VERSION = "v1.5.4 (UI Refinement)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -647,19 +647,19 @@ elif menu_selection == "Transaction Log":
         # Display the list
         if not transactions_df.empty:
             # Header
-            h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([1, 2, 2, 1.5, 1.5, 2, 3, 2])
+            h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([0.6, 1.8, 1.8, 1.2, 1, 1.5, 2, 1.4])
             h1.markdown("**ID**")
             h2.markdown("**Time**")
             h3.markdown("**Customer**")
             h4.markdown("**Meal**")
-            h5.markdown("**Change**")
+            h5.markdown("**+/-**")
             h6.markdown("**Payment**")
             h7.markdown("**Note**")
             h8.markdown("**Actions**")
             st.divider()
             
             for _, row in transactions_df.iterrows():
-                c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([1, 2, 2, 1.5, 1.5, 2, 3, 2])
+                c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.6, 1.8, 1.8, 1.2, 1, 1.5, 2, 1.4])
                 c1.write(str(row['id']))
                 ts = row['timestamp']
                 c2.write(ts.strftime("%Y-%m-%d %H:%M") if pd.notnull(ts) else "-")
@@ -676,8 +676,6 @@ elif menu_selection == "Transaction Log":
                     with b2:
                         if st.button("🗑️", key=f"del_{row['id']}", help="Delete"):
                             delete_dialog(row)
-                st.divider()
-        
                 st.divider()
         
         # --- PAGINATION CONTROLS (At Bottom) ---
