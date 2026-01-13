@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.5.2 (Dark Mode Fix)"
+APP_VERSION = "v1.5.3 (Balanced Footer)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -530,50 +530,48 @@ elif menu_selection == "Transaction Log":
             div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
                 position: fixed !important;
                 bottom: 0 !important;
-                right: 0 !important;
-                left: 256px !important; /* Sidebar width */
-                background-color: rgba(255, 255, 255, 0.95) !important; /* Fallback white */
-                z-index: 1000 !important;
-                border-top: 1px solid rgba(128, 128, 128, 0.2) !important;
+                left: 0 !important;
+                width: 100% !important; /* Span full screen width */
+                background-color: white !important; /* Solid background for visibility */
+                z-index: 100 !important; /* Low enough that sidebar stays on top */
+                border-top: 1px solid #e0e0e0 !important;
                 padding: 15px 0 !important;
-                box-shadow: 0px -4px 15px rgba(0,0,0,0.15) !important;
+                box-shadow: 0px -4px 15px rgba(0,0,0,0.2) !important;
                 display: flex !important;
                 justify-content: center !important;
             }
             
-            /* Dark Mode Overrides for the footer background */
+            /* Dark Mode Support */
             [data-theme="dark"] div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
-                background-color: rgba(14, 17, 23, 0.95) !important; /* Standard Streamlit Dark Background */
+                background-color: #0e1117 !important;
+                border-top: 1px solid #31333f !important;
             }
 
-            /* Force visibility of buttons, especially disabled ones */
-            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div button {
-                border: 1px solid #ff4b4b !important; /* Add a subtle red border to make it pop */
-                background-color: transparent !important;
-            }
-            
-            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div button:disabled {
-                color: rgba(128, 128, 128, 0.8) !important;
-                cursor: not-allowed !important;
-                border-color: rgba(128, 128, 128, 0.3) !important;
-                opacity: 0.6 !important;
-            }
-
-            /* Responsive: Sidebar collapses on small screens */
-            @media (max-width: 991px) {
-                div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
-                    left: 0 !important;
-                }
-            }
-
-            /* Container for buttons */
+            /* Container for the columns - center it with a max-width */
             div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div > [data-testid="stHorizontalBlock"] {
                 width: 100% !important;
                 max-width: 600px !important;
-                margin: auto !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+                padding-left: 20px !important;
+                padding-right: 20px !important;
             }
             
-            /* Add padding to body */
+            /* Button styling to ensure visibility */
+            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div button {
+                border: 1px solid rgba(128, 128, 128, 0.5) !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            }
+            
+            /* Ensure disabled buttons aren't totally invisible */
+            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div button:disabled {
+                opacity: 0.4 !important;
+                color: gray !important;
+                background-color: transparent !important;
+                border-color: rgba(128, 128, 128, 0.2) !important;
+            }
+
+            /* Push main content up so it's not hidden */
             .main .block-container {
                 padding-bottom: 120px !important;
             }
