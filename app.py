@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.4.2 (Fixed Sticky UI)"
+APP_VERSION = "v1.4.3 (Fixed Sticky V2)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -524,30 +524,34 @@ elif menu_selection == "Transaction Log":
     st.header("📜 Transaction Log")
     
     # --- STICKY FOOTER CSS ---
-    # Use CSS :has() to target the container that holds our marker
+    # Strategy: Render a marker, then target the immediately following sibling (the columns)
     st.markdown("""
         <style>
-            /* Target the Streamlit container that has our unique marker ID */
-            div[data-testid="stVerticalBlock"] > div:has(div#sticky-footer-marker) {
-                position: fixed;
-                bottom: 0;
-                left: 0;
+            /* Target the div that comes RIGHT AFTER the marker's container */
+            div:has(div#sticky-footer-marker) + div {
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                background-color: white !important;
+                z-index: 99999 !important;
+                border-top: 1px solid #e0e0e0 !important;
+                padding: 10px 0 !important;
+                box-shadow: 0px -2px 10px rgba(0,0,0,0.1) !important;
+                display: flex !important;
+                justify-content: center !important;
+            }
+            
+            /* Ensure the columns inside take full width but utilize internal spacing */
+            div:has(div#sticky-footer-marker) + div > [data-testid="stHorizontalBlock"] {
                 width: 100%;
-                background-color: white;
-                z-index: 100000;
-                border-top: 1px solid #e0e0e0;
-                padding: 10px 0;
-                box-shadow: 0px -2px 5px rgba(0,0,0,0.05);
+                max-width: 800px; /* Limit width on large screens for better looks */
+                margin: auto;
             }
             
             /* Add padding to body so footer doesn't hide content */
             .main .block-container {
                 padding-bottom: 120px;
-            }
-            
-            /* Center the columns inside the sticky footer if needed */
-            div[data-testid="stVerticalBlock"] > div:has(div#sticky-footer-marker) [data-testid="stHorizontalBlock"] {
-                align-items: center;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -679,23 +683,22 @@ elif menu_selection == "Transaction Log":
         st.caption("No transactions found.")
 
     # --- RENDER STICKY FOOTER ---
-    # Use a container to group the marker and the buttons logic
-    with st.container():
-        # Marker for CSS targeting
-        st.markdown('<div id="sticky-footer-marker"></div>', unsafe_allow_html=True)
-        
-        c_prev, c_txt, c_next = st.columns([1, 2, 1])
-        with c_prev:
-            if st.button("Previous", disabled=(current_page == 1), key="prev_btn", use_container_width=True):
-                 st.session_state['log_page_number'] -= 1
-                 st.rerun()
-        with c_next:
-             if st.button("Next", disabled=(current_page == total_pages if total_count > 0 else True), key="next_btn", use_container_width=True):
-                 st.session_state['log_page_number'] += 1
-                 st.rerun()
-        with c_txt:
-            # Centered text using markdown with styling
-            st.markdown(f"<div style='text-align: center; padding-top: 8px; font-weight: 500;'>Page {current_page} of {max(1, total_pages)}</div>", unsafe_allow_html=True)
+    # 1. Place the marker
+    st.markdown('<div id="sticky-footer-marker"></div>', unsafe_allow_html=True)
+    
+    # 2. Place the columns immediately after (Warning: Do not put anything else in between)
+    c_prev, c_txt, c_next = st.columns([1, 2, 1])
+    with c_prev:
+        if st.button("Previous", disabled=(current_page == 1), key="prev_btn", use_container_width=True):
+             st.session_state['log_page_number'] -= 1
+             st.rerun()
+    with c_next:
+         if st.button("Next", disabled=(current_page == total_pages if total_count > 0 else True), key="next_btn", use_container_width=True):
+             st.session_state['log_page_number'] += 1
+             st.rerun()
+    with c_txt:
+        # Centered text using markdown with styling
+        st.markdown(f"<div style='text-align: center; padding-top: 8px; font-weight: 500;'>Page {current_page} of {max(1, total_pages)}</div>", unsafe_allow_html=True)
 
 
 
