@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.5.0 (Sidebar-Aware UI)"
+APP_VERSION = "v1.5.1 (Sidebar-Aware UI)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
