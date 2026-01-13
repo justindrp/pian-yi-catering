@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.4.4 (Fixed Sticky V3)"
+APP_VERSION = "v1.5.0 (Sidebar-Aware UI)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -524,17 +524,16 @@ elif menu_selection == "Transaction Log":
     st.header("📜 Transaction Log")
     
     # --- STICKY FOOTER CSS ---
-    # Strategy: Render a marker, then target the immediately following stElementContainer (the columns)
     st.markdown("""
         <style>
             /* Target ONLY the stElementContainer that follows our marker's container */
             div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
                 position: fixed !important;
                 bottom: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
+                right: 0 !important;
+                left: 256px !important; /* Sidebar width */
                 background-color: white !important;
-                z-index: 200 !important; /* High enough to be above content, low enough for Manage App button */
+                z-index: 1000 !important;
                 border-top: 1px solid #e0e0e0 !important;
                 padding: 10px 0 !important;
                 box-shadow: 0px -2px 10px rgba(0,0,0,0.1) !important;
@@ -542,16 +541,23 @@ elif menu_selection == "Transaction Log":
                 justify-content: center !important;
             }
             
-            /* Ensure the columns inside take full width but utilize internal spacing */
+            /* Responsive: Sidebar collapses on small screens */
+            @media (max-width: 991px) {
+                div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
+                    left: 0 !important;
+                }
+            }
+
+            /* Container for buttons */
             div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div > [data-testid="stHorizontalBlock"] {
-                width: 100%;
-                max-width: 800px; /* Limit width on large screens */
-                margin: auto;
+                width: 100% !important;
+                max-width: 600px !important;
+                margin: auto !important;
             }
             
-            /* Add padding to body so footer doesn't hide content */
+            /* Add padding to body */
             .main .block-container {
-                padding-bottom: 120px;
+                padding-bottom: 120px !important;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -687,15 +693,15 @@ elif menu_selection == "Transaction Log":
     
     col_p, col_c, col_n = st.columns([1, 2, 1])
     with col_p:
-        if st.button("<", disabled=(current_page == 1), key="prev_btn", use_container_width=True, help="Previous Page"):
+        if st.button("<", disabled=(current_page == 1), key="prev_btn", use_container_width=True):
              st.session_state['log_page_number'] -= 1
              st.rerun()
     with col_n:
-         if st.button(">", disabled=(current_page == total_pages if total_count > 0 else True), key="next_btn", use_container_width=True, help="Next Page"):
+         if st.button(">", disabled=(current_page == total_pages if total_count > 0 else True), key="next_btn", use_container_width=True):
              st.session_state['log_page_number'] += 1
              st.rerun()
     with col_c:
-        st.markdown(f"<div style='text-align: center; font-weight: bold; margin-top: 8px;'>Page {current_page} / {max(1, total_pages)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; font-weight: bold; margin-top: 10px;'>Page {current_page} / {max(1, total_pages)}</div>", unsafe_allow_html=True)
 
 
 
