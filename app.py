@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.4.3 (Fixed Sticky V2)"
+APP_VERSION = "v1.4.4 (Fixed Sticky V3)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -524,17 +524,17 @@ elif menu_selection == "Transaction Log":
     st.header("📜 Transaction Log")
     
     # --- STICKY FOOTER CSS ---
-    # Strategy: Render a marker, then target the immediately following sibling (the columns)
+    # Strategy: Render a marker, then target the immediately following stElementContainer (the columns)
     st.markdown("""
         <style>
-            /* Target the div that comes RIGHT AFTER the marker's container */
-            div:has(div#sticky-footer-marker) + div {
+            /* Target ONLY the stElementContainer that follows our marker's container */
+            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
                 position: fixed !important;
                 bottom: 0 !important;
                 left: 0 !important;
                 width: 100% !important;
                 background-color: white !important;
-                z-index: 99999 !important;
+                z-index: 200 !important; /* High enough to be above content, low enough for Manage App button */
                 border-top: 1px solid #e0e0e0 !important;
                 padding: 10px 0 !important;
                 box-shadow: 0px -2px 10px rgba(0,0,0,0.1) !important;
@@ -543,9 +543,9 @@ elif menu_selection == "Transaction Log":
             }
             
             /* Ensure the columns inside take full width but utilize internal spacing */
-            div:has(div#sticky-footer-marker) + div > [data-testid="stHorizontalBlock"] {
+            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div > [data-testid="stHorizontalBlock"] {
                 width: 100%;
-                max-width: 800px; /* Limit width on large screens for better looks */
+                max-width: 800px; /* Limit width on large screens */
                 margin: auto;
             }
             
