@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.5.1 (Sidebar-Aware UI)"
+APP_VERSION = "v1.5.2 (Dark Mode Fix)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -532,15 +532,33 @@ elif menu_selection == "Transaction Log":
                 bottom: 0 !important;
                 right: 0 !important;
                 left: 256px !important; /* Sidebar width */
-                background-color: white !important;
+                background-color: rgba(255, 255, 255, 0.95) !important; /* Fallback white */
                 z-index: 1000 !important;
-                border-top: 1px solid #e0e0e0 !important;
-                padding: 10px 0 !important;
-                box-shadow: 0px -2px 10px rgba(0,0,0,0.1) !important;
+                border-top: 1px solid rgba(128, 128, 128, 0.2) !important;
+                padding: 15px 0 !important;
+                box-shadow: 0px -4px 15px rgba(0,0,0,0.15) !important;
                 display: flex !important;
                 justify-content: center !important;
             }
             
+            /* Dark Mode Overrides for the footer background */
+            [data-theme="dark"] div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
+                background-color: rgba(14, 17, 23, 0.95) !important; /* Standard Streamlit Dark Background */
+            }
+
+            /* Force visibility of buttons, especially disabled ones */
+            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div button {
+                border: 1px solid #ff4b4b !important; /* Add a subtle red border to make it pop */
+                background-color: transparent !important;
+            }
+            
+            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div button:disabled {
+                color: rgba(128, 128, 128, 0.8) !important;
+                cursor: not-allowed !important;
+                border-color: rgba(128, 128, 128, 0.3) !important;
+                opacity: 0.6 !important;
+            }
+
             /* Responsive: Sidebar collapses on small screens */
             @media (max-width: 991px) {
                 div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
