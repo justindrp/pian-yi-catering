@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.3.0 (Customer Actions)"
+APP_VERSION = "v1.4.0 (Log Pagination)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -70,17 +70,23 @@ def get_all_customers():
     return conn.query("SELECT * FROM customers ORDER BY name ASC", ttl=0)
 
 @st.cache_data
-def get_recent_transactions():
+def get_paginated_transactions(limit, offset):
     query = """
     SELECT 
         t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note, t.meal_type 
     FROM transactions t
     JOIN customers c ON t.customer_id = c.id
     ORDER BY t.timestamp DESC 
-    LIMIT 50
+    LIMIT :limit OFFSET :offset
     """
     # Use ttl=0 to disable connection-level cache, relying on st.cache_data
-    return conn.query(query, ttl=0)
+    return conn.query(query, params={"limit": limit, "offset": offset}, ttl=0)
+
+@st.cache_data
+def get_total_transaction_count():
+    query = "SELECT COUNT(*) FROM transactions"
+    result = conn.query(query, ttl=0)
+    return int(result.iloc[0, 0]) if not result.empty else 0
 
 def update_quota(customer_id, change_amount, payment_amount, note, timestamp=None, meal_type=None):
     if timestamp is None:
@@ -516,9 +522,30 @@ elif menu_selection == "Manage Customers":
 # --- D. TRANSACTION LOG ---
 elif menu_selection == "Transaction Log":
     st.header("📜 Transaction Log")
-    st.caption("Showing last 50 transactions")
     
-    transactions_df = get_recent_transactions()
+    # Pagination Controls
+    col1, col2, col3 = st.columns([2, 2, 4])
+    with col1:
+        rows_per_page = st.selectbox("Rows per page", [10, 20, 50, 100], index=1)
+    
+    # Get total count to calculate pages
+    total_count = get_total_transaction_count()
+    if total_count > 0:
+        import math
+        total_pages = math.ceil(total_count / rows_per_page)
+        
+        with col2:
+            current_page = st.number_input("Page", min_value=1, max_value=total_pages, step=1, value=1)
+            
+        st.caption(f"Showing {rows_per_page} rows. Page {current_page} of {total_pages}. (Total: {total_count} transactions)")
+        
+        # Calculate Offset
+        offset = (current_page - 1) * rows_per_page
+        transactions_df = get_paginated_transactions(rows_per_page, offset)
+    else:
+        st.caption("No transactions found.")
+        transactions_df = pd.DataFrame() # Empty
+        
     if not transactions_df.empty:
         # Header Row
         h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([1, 2, 2, 1.5, 1.5, 2, 3, 2])
