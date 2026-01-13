@@ -683,22 +683,19 @@ elif menu_selection == "Transaction Log":
         st.caption("No transactions found.")
 
     # --- RENDER STICKY FOOTER ---
-    # 1. Place the marker
     st.markdown('<div id="sticky-footer-marker"></div>', unsafe_allow_html=True)
     
-    # 2. Place the columns immediately after (Warning: Do not put anything else in between)
-    c_prev, c_txt, c_next = st.columns([1, 2, 1])
-    with c_prev:
-        if st.button("Previous", disabled=(current_page == 1), key="prev_btn", use_container_width=True):
+    col_p, col_c, col_n = st.columns([1, 2, 1])
+    with col_p:
+        if st.button("<", disabled=(current_page == 1), key="prev_btn", use_container_width=True, help="Previous Page"):
              st.session_state['log_page_number'] -= 1
              st.rerun()
-    with c_next:
-         if st.button("Next", disabled=(current_page == total_pages if total_count > 0 else True), key="next_btn", use_container_width=True):
+    with col_n:
+         if st.button(">", disabled=(current_page == total_pages if total_count > 0 else True), key="next_btn", use_container_width=True, help="Next Page"):
              st.session_state['log_page_number'] += 1
              st.rerun()
-    with c_txt:
-        # Centered text using markdown with styling
-        st.markdown(f"<div style='text-align: center; padding-top: 8px; font-weight: 500;'>Page {current_page} of {max(1, total_pages)}</div>", unsafe_allow_html=True)
+    with col_c:
+        st.markdown(f"<div style='text-align: center; font-weight: bold; margin-top: 8px;'>Page {current_page} / {max(1, total_pages)}</div>", unsafe_allow_html=True)
 
 
 
