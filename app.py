@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.6.1 (Centered Dynamic Footer)"
+APP_VERSION = "v1.7.0 (Refund Function)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -342,7 +342,7 @@ st.title("🍱 Pian Yi Catering - Quota Manager")
 
 # Sidbar Navigation
 st.sidebar.title("Navigation")
-menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Manage Customers", "Transaction Log", "Daily Recap", "User Guide"])
+menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Refund", "Manage Customers", "Transaction Log", "Daily Recap", "User Guide"])
 st.sidebar.divider()
 st.sidebar.caption(f"App Version: {APP_VERSION}")
 
@@ -465,6 +465,53 @@ elif menu_selection == "Top Up Quota":
             update_quota(int(selected_customer['id']), qty, total_price, f"Top Up: {package_name}", tx_timestamp)
             st.success(f"Successfully added {qty} portions to {selected_name}'s quota on {selected_date}!")
             st.rerun()
+
+# --- B2. REFUND ---
+elif menu_selection == "Refund":
+    st.header("💸 Refund portions")
+    
+    customers_df = get_all_customers()
+    if customers_df.empty:
+        st.warning("No customers found. Please add a customer first.")
+    else:
+        customer_options = {row['name']: row for _, row in customers_df.iterrows()}
+        selected_name = st.selectbox("Select Customer", options=list(customer_options.keys()))
+        customer_data = customer_options[selected_name]
+        
+        st.divider()
+        st.metric(label="Current Quota Balance", value=f"{customer_data['quota_balance']} Portions")
+        
+        with st.form("refund_form"):
+            portions_to_refund = st.number_input("Portions to Refund (Deduct from Balance)", min_value=0, value=0, help="Specify how many portions the customer is returning.")
+            amount_to_refund = st.number_input("Amount to Refund (Returns to Customer IDR)", min_value=0, value=0, step=1000, help="Specify how much money is being returned to the customer.")
+            reason = st.text_input("Reason", placeholder="e.g., Customer leaving, incorrect top-up")
+            
+            # Shared Date Selection
+            if 'redeem_date' not in st.session_state:
+                st.session_state['redeem_date'] = datetime.now().date()
+            selected_date = st.date_input("Refund Date", value=st.session_state['redeem_date'])
+            
+            submit_refund = st.form_submit_button("Confirm Refund", type="primary")
+            
+            if submit_refund:
+                if portions_to_refund <= 0 and amount_to_refund <= 0:
+                    st.error("Please specify portions or amount to refund.")
+                elif portions_to_refund > customer_data['quota_balance']:
+                    st.error(f"Cannot refund {portions_to_refund} portions. Customer only has {customer_data['quota_balance']} portions.")
+                else:
+                    current_time = datetime.now().time()
+                    tx_timestamp = datetime.combine(selected_date, current_time)
+                    
+                    # Log as negative values
+                    update_quota(
+                        int(customer_data['id']), 
+                        -portions_to_refund, 
+                        -amount_to_refund, 
+                        f"Refund: {reason}", 
+                        tx_timestamp
+                    )
+                    st.success(f"Successfully refunded {portions_to_refund} portions and {amount_to_refund:,.0f} IDR for {selected_name}!")
+                    st.rerun()
 
 # --- C. MANAGE CUSTOMERS ---
 elif menu_selection == "Manage Customers":
