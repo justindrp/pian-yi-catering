@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.7.0 (Refund Function)"
+APP_VERSION = "v1.7.1 (Documentation Update)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -827,23 +827,25 @@ elif menu_selection == "User Guide":
     
     ### 2. Top Up Quota 💰
     - Go to **Top Up Quota**.
-    - Select the customer.
-    - Choose a **Package** (e.g., "10 Portions").
-    - The price is auto-calculated based on configuration.
-    - **Edit Price:** You can manually change the **Unit Price** if you are giving a special discount.
+    - Select the customer and choose a **Package**.
+    - **Edit Price:** You can manually change the **Unit Price** if needed.
     
-    ### 3. Manage Customers 👥
-    - Go to **Manage Customers**.
-    - Open **"Add New Customer"**.
-    - Enter Name and Phone Number.
-    - Click **"Add Customer"**.
+    ### 3. Refund 💸
+    - Go to **Refund**.
+    - Used when a customer returns portions for cash.
+    - It deducts portions from their quota and records a negative payment value.
     
-    ### 4. Transaction Log 📜
-    - Use this to view the history of all Top Ups and Redemptions.
-    - Shows the last 50 transactions.
-    - **Edit & Delete**:
-        - Click the **Pencil (✏️)** icon to edit a transaction using **Unit Price** (Total is auto-calculated).
-        - You can also update the **Date** and **Meal Type** (Lunch/Dinner).
-        - Click the **Trash Can (🗑️)** icon to delete a transaction.
-        - ⚠️ **Important:** Editing or Deleting will automatically update the customer's Quota Balance!
+    ### 4. Manage Customers 👥
+    - View and edit your customer database.
+    - Click the **Pencil (✏️)** to update name/phone.
+    - Click the **Trash Can (🗑️)** to delete a customer and all their transaction history.
+    
+    ### 5. Transaction Log 📜
+    - View all history with **Sticky Pagination** at the bottom.
+    - **Edit/Delete Transactions:** Use the inline icons (✏️/🗑️) to fix errors.
+    - **Note:** The `+/-` column shows how many portions were changed.
+    
+    ### 6. Daily Recap 📊
+    - Select a date to see a summary of that day's performance.
+    - Shows total **Revenue**, **Top Ups**, and a breakdown of **Lunch vs Dinner** redemptions.
     """)
