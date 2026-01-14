@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.5.5 (UI Refinement)"
+APP_VERSION = "v1.6.1 (Centered Dynamic Footer)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -526,52 +526,54 @@ elif menu_selection == "Transaction Log":
     # --- STICKY FOOTER CSS ---
     st.markdown("""
         <style>
-            /* Target ONLY the stElementContainer that follows our marker's container */
+            /* Sticky footer: Sidebar-Aware & Theme-Dynamic */
             div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
                 position: fixed !important;
                 bottom: 0 !important;
-                left: 0 !important;
-                width: 100% !important; /* Span full screen width */
-                background-color: white !important; /* Solid background for visibility */
-                z-index: 100 !important; /* Low enough that sidebar stays on top */
-                border-top: 1px solid #e0e0e0 !important;
-                padding: 15px 0 !important;
-                box-shadow: 0px -4px 15px rgba(0,0,0,0.2) !important;
+                left: 256px !important;
+                width: calc(100% - 256px) !important;
+                background-color: var(--background-color) !important;
+                color: var(--text-color) !important;
+                border-top: 1px solid var(--secondary-background-color) !important;
+                z-index: 1000 !important;
+                padding: 15px !important;
+                box-shadow: 0px -4px 15px rgba(0,0,0,0.1) !important;
                 display: flex !important;
                 justify-content: center !important;
-            }
-            
-            /* Dark Mode Support */
-            [data-theme="dark"] div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
-                background-color: #0e1117 !important;
-                border-top: 1px solid #31333f !important;
+                align-items: center !important;
+                transition: left 0.3s, width 0.3s !important;
             }
 
-            /* Container for the columns - center it with a max-width */
+            /* Internal flex container for centering and gap */
             div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div > [data-testid="stHorizontalBlock"] {
+                display: flex !important;
+                flex-direction: row !important;
+                justify-content: center !important;
+                align-items: center !important;
+                gap: 2rem !important;
                 width: 100% !important;
-                max-width: 600px !important;
-                margin-left: auto !important;
-                margin-right: auto !important;
-                padding-left: 20px !important;
-                padding-right: 20px !important;
+                max-width: 800px !important;
+                margin: 0 auto !important;
             }
             
-            /* Button styling to ensure visibility */
-            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div button {
-                border: 1px solid rgba(128, 128, 128, 0.5) !important;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-            }
-            
-            /* Ensure disabled buttons aren't totally invisible */
-            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div button:disabled {
-                opacity: 0.4 !important;
-                color: gray !important;
-                background-color: transparent !important;
-                border-color: rgba(128, 128, 128, 0.2) !important;
+            /* Columns behave as flex items with automatic width */
+            div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div [data-testid="stColumn"] {
+                width: auto !important;
+                flex: none !important;
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
             }
 
-            /* Push main content up so it's not hidden */
+            /* Responsive: Sidebar collapses on small screens */
+            @media (max-width: 991px) {
+                div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
+                    left: 0 !important;
+                    width: 100% !important;
+                }
+            }
+
+            /* Ensure main content is padded so footer doesn't overlap final rows */
             .main .block-container {
                 padding-bottom: 120px !important;
             }
