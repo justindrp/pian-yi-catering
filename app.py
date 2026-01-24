@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.7.5 (UI Polish)"
+APP_VERSION = "v1.7.6 (UI Header Fix)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -576,7 +576,8 @@ elif menu_selection == "Manage Customers":
         st.divider()
 
         # Header - Clickable sorting
-        # Use columns with specific vertical alignment if supported, or just rely on CSS
+        # Marker for CSS targeting
+        st.markdown('<div id="cust-list-header-marker"></div>', unsafe_allow_html=True)
         h1, h2, h3, h4, h5 = st.columns([0.8, 3, 2, 2, 2.2], vertical_alignment="center")
         
         with h1:
@@ -664,8 +665,8 @@ elif menu_selection == "Transaction Log":
                 min-width: 35px !important;
             }
 
-            /* Sortable Header Button Styling - Make them look like text */
-            div[data-testid="stColumn"] button[key^="sort_"] {
+            /* Sortable Header Button Styling - Targeted via Marker */
+            div:has(div#cust-list-header-marker) + div button {
                 border: none !important;
                 background: transparent !important;
                 color: var(--text-color) !important;
@@ -674,10 +675,18 @@ elif menu_selection == "Transaction Log":
                 font-weight: bold !important;
                 text-align: left !important;
                 box-shadow: none !important;
+                min-height: 0px !important;
+                height: auto !important;
+                padding-top: 5px !important;
             }
-            div[data-testid="stColumn"] button[key^="sort_"]:hover {
+            div:has(div#cust-list-header-marker) + div button:hover {
                 color: var(--primary-color) !important;
                 text-decoration: underline !important;
+            }
+            div:has(div#cust-list-header-marker) + div button:focus {
+                color: var(--primary-color) !important;
+                border: none !important;
+                box-shadow: none !important;
             }
 
             /* Internal flex container for centering and gap */
