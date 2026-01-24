@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.7.2 (Fixes & Mobile UI)"
+APP_VERSION = "v1.7.3 (Customer Search & Sort)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -551,7 +551,33 @@ elif menu_selection == "Manage Customers":
     st.subheader("Customer List")
     customers_df = get_all_customers()
     if not customers_df.empty:
-        # Header
+        # --- Search and Sort Controls ---
+        col_search, col_sort = st.columns([2, 1])
+        with col_search:
+            search_query = st.text_input("🔍 Search Name or Phone", placeholder="Type to filter...")
+        with col_sort:
+            sort_order = st.selectbox("Sort By", ["Name (A-Z)", "Name (Z-A)", "Quota (High-Low)", "Quota (Low-High)"])
+
+        # Apply Search
+        if search_query:
+            customers_df = customers_df[
+                customers_df['name'].str.contains(search_query, case=False, na=False) | 
+                customers_df['phone'].str.contains(search_query, case=False, na=False)
+            ]
+
+        # Apply Sorting
+        if sort_order == "Name (A-Z)":
+            customers_df = customers_df.sort_values('name', ascending=True)
+        elif sort_order == "Name (Z-A)":
+            customers_df = customers_df.sort_values('name', ascending=False)
+        elif sort_order == "Quota (High-Low)":
+            customers_df = customers_df.sort_values('quota_balance', ascending=False)
+        elif sort_order == "Quota (Low-High)":
+            customers_df = customers_df.sort_values('quota_balance', ascending=True)
+
+        st.divider()
+
+        # Header - Adjusted weights for mobile actions
         h1, h2, h3, h4, h5 = st.columns([0.8, 3, 2, 2, 2.2])
         h1.markdown("**ID**")
         h2.markdown("**Name**")
