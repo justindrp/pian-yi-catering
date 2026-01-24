@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.0 (Glassmorphism UI)"
+APP_VERSION = "v1.9.1 (Modern Sidebar)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -446,6 +446,66 @@ st.markdown("""
         /* Hide Streamlit Branding */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
+
+        /* --- SIDEBAR STYLING (Glassmorphic) --- */
+        section[data-testid="stSidebar"] {
+            background-color: rgba(255, 255, 255, 0.45) !important;
+            backdrop-filter: blur(15px) !important;
+            -webkit-backdrop-filter: blur(15px) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05) !important;
+        }
+
+        /* Sidebar Navigation Radio Buttons - Modern Pills */
+        div[data-testid="stSidebar"] div[role="radiogroup"] label {
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            border-radius: 8px !important;
+            padding: 10px 15px !important;
+            margin-bottom: 5px !important;
+            transition: all 0.2s ease !important;
+        }
+
+        div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+            background: rgba(255, 255, 255, 0.4) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            transform: translateX(3px) !important;
+        }
+
+        /* Active State for Sidebar Radio */
+        div[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%) !important;
+            border: 1px solid rgba(99, 102, 241, 0.2) !important;
+            color: #6366f1 !important;
+            font-weight: 600 !important;
+        }
+
+        /* Hide the default radio circle */
+        div[data-testid="stSidebar"] div[role="radiogroup"] label div[role="radio"] {
+            display: none !important;
+        }
+
+        /* Sidebar Text Spacing */
+        div[data-testid="stSidebar"] div[role="radiogroup"] label p {
+            font-size: 15px !important;
+            margin: 0 !important;
+        }
+
+        /* Dark Mode Sidebar */
+        @media (prefers-color-scheme: dark) {
+            section[data-testid="stSidebar"] {
+                background-color: rgba(0, 0, 0, 0.3) !important;
+                border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+            }
+            div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+                background: rgba(255, 255, 255, 0.05) !important;
+            }
+            div[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
+                background: linear-gradient(90deg, rgba(99, 102, 241, 0.2) 0%, rgba(99, 102, 241, 0.1) 100%) !important;
+                border: 1px solid rgba(99, 102, 241, 0.4) !important;
+                color: #818cf8 !important; /* Lighter indigo for dark mode */
+            }
+        }
     </style>
 """, unsafe_allow_html=True)
 
