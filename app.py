@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.7.1 (Documentation Update)"
+APP_VERSION = "v1.7.2 (Fixes & Mobile UI)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -73,7 +73,7 @@ def get_all_customers():
 def get_paginated_transactions(limit, offset):
     query = """
     SELECT 
-        t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note, t.meal_type 
+        t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note, t.meal_type, t.customer_id 
     FROM transactions t
     JOIN customers c ON t.customer_id = c.id
     ORDER BY t.timestamp DESC 
@@ -185,27 +185,35 @@ def edit_dialog(tx_row):
         # Combine Date and Time
         new_timestamp = datetime.combine(new_date, new_time)
         
-        # Fetch customer ID safely
-        cust_id_lookup = get_all_customers()
-        cust_row = cust_id_lookup[cust_id_lookup['name'] == tx_row['name']]
+        # Fetch customer ID safely from the transaction row itself
+        cid = int(tx_row['customer_id'])
         
-        if not cust_row.empty:
-            cid = int(cust_row.iloc[0]['id'])
-            # Helper function call
-            edit_transaction(
-                int(tx_row['id']),
-                cid,
-                int(tx_row['change_amount']),
-                int(new_change),
-                int(new_pay),
-                new_note,
-                new_timestamp,
-                new_meal
-            )
-            st.success("Updated!")
-            st.rerun()
-        else:
-            st.error("Customer not found.")
+        # Fetch current balance to check for negative result
+        customers_df = get_all_customers()
+        customer_row = customers_df[customers_df['id'] == cid]
+        
+        if not customer_row.empty:
+            current_balance = int(customer_row.iloc[0]['quota_balance'])
+            diff = int(new_change) - int(tx_row['change_amount'])
+            resulting_balance = current_balance + diff
+            
+            if resulting_balance < 0:
+                st.error(f"❌ Cannot update! This change would result in a negative quota balance ({resulting_balance} portions).")
+                return
+
+        # Helper function call
+        edit_transaction(
+            int(tx_row['id']),
+            cid,
+            int(tx_row['change_amount']),
+            int(new_change),
+            int(new_pay),
+            new_note,
+            new_timestamp,
+            new_meal
+        )
+        st.success("Updated!")
+        st.rerun()
 
 @st.dialog("Confirm Deletion")
 def delete_dialog(tx_row):
@@ -215,21 +223,27 @@ def delete_dialog(tx_row):
     st.write("⚠️ This will revert the Quota Balance change.")
     
     if st.button("Yes, Delete", type="primary"):
-         # Fetch customer ID safely
-        cust_id_lookup = get_all_customers()
-        cust_row = cust_id_lookup[cust_id_lookup['name'] == tx_row['name']]
+         # Fetch customer ID safely from the transaction row itself
+        cid = int(tx_row['customer_id'])
         
-        if not cust_row.empty:
-            cid = int(cust_row.iloc[0]['id'])
-            delete_transaction(
-                int(tx_row['id']), 
-                cid,
-                int(tx_row['change_amount'])
-            )
-            st.success("Deleted.")
-            st.rerun()
-        else:
-            st.error("Customer not found.")
+        # Check if deletion would cause negative balance (for Top Ups)
+        orig_change = int(tx_row['change_amount'])
+        if orig_change > 0:
+            customers_df = get_all_customers()
+            customer_row = customers_df[customers_df['id'] == cid]
+            if not customer_row.empty:
+                current_balance = int(customer_row.iloc[0]['quota_balance'])
+                if (current_balance - orig_change) < 0:
+                    st.error(f"❌ Cannot delete! Deleting this Top Up would result in a negative balance ({current_balance - orig_change}).")
+                    return
+
+        delete_transaction(
+            int(tx_row['id']), 
+            cid,
+            int(tx_row['change_amount'])
+        )
+        st.success("Deleted.")
+        st.rerun()
 
 @st.dialog("Edit Customer")
 def edit_customer_dialog(row):
@@ -489,7 +503,7 @@ elif menu_selection == "Refund":
             # Shared Date Selection
             if 'redeem_date' not in st.session_state:
                 st.session_state['redeem_date'] = datetime.now().date()
-            selected_date = st.date_input("Refund Date", value=st.session_state['redeem_date'])
+            selected_date = st.date_input("Refund Date", key='redeem_date')
             
             submit_refund = st.form_submit_button("Confirm Refund", type="primary")
             
@@ -538,7 +552,7 @@ elif menu_selection == "Manage Customers":
     customers_df = get_all_customers()
     if not customers_df.empty:
         # Header
-        h1, h2, h3, h4, h5 = st.columns([1, 3, 2, 2, 2])
+        h1, h2, h3, h4, h5 = st.columns([0.8, 3, 2, 2, 2.2])
         h1.markdown("**ID**")
         h2.markdown("**Name**")
         h3.markdown("**Phone**")
@@ -547,7 +561,7 @@ elif menu_selection == "Manage Customers":
         st.divider()
         
         for _, row in customers_df.iterrows():
-            c1, c2, c3, c4, c5 = st.columns([1, 3, 2, 2, 2])
+            c1, c2, c3, c4, c5 = st.columns([0.8, 3, 2, 2, 2.2])
             c1.write(str(row['id']))
             c2.write(row['name'])
             c3.write(row['phone'] if pd.notnull(row['phone']) else "-")
@@ -589,6 +603,13 @@ elif menu_selection == "Transaction Log":
                 justify-content: center !important;
                 align-items: center !important;
                 transition: left 0.3s, width 0.3s !important;
+            }
+
+            /* Fix for squashed action buttons on mobile */
+            button[kind="secondary"] {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+                min-width: 35px !important;
             }
 
             /* Internal flex container for centering and gap */
@@ -695,8 +716,8 @@ elif menu_selection == "Transaction Log":
         
         # Display the list
         if not transactions_df.empty:
-            # Header
-            h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([0.8, 1.8, 1.8, 1.2, 1, 1.5, 2, 1.4])
+            # Header - Adjusted weights for mobile actions
+            h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([0.8, 1.8, 1.8, 1.2, 1, 1.5, 1.8, 1.6])
             h1.markdown("**ID**")
             h2.markdown("**Time**")
             h3.markdown("**Customer**")
@@ -708,7 +729,7 @@ elif menu_selection == "Transaction Log":
             st.divider()
             
             for _, row in transactions_df.iterrows():
-                c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.8, 1.8, 1.8, 1.2, 1, 1.5, 2, 1.4])
+                c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.8, 1.8, 1.8, 1.2, 1, 1.5, 1.8, 1.6])
                 c1.write(str(row['id']))
                 ts = row['timestamp']
                 c2.write(ts.strftime("%Y-%m-%d %H:%M") if pd.notnull(ts) else "-")
