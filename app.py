@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.3 (Material Icons)"
+APP_VERSION = "v1.9.4 (UI Refinement)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -860,10 +860,10 @@ elif menu_selection == "Manage Customers":
                 # Use columns for tight button spacing
                 b1, b2 = st.columns(2)
                 with b1:
-                    if st.button("Edit", icon=":material/edit:", key=f"edit_cust_{row['id']}", help="Edit Customer"):
+                    if st.button("", icon=":material/edit:", key=f"edit_cust_{row['id']}", help="Edit Customer"):
                          edit_customer_dialog(row)
                 with b2:
-                    if st.button("Delete", icon=":material/delete:", key=f"del_cust_{row['id']}", help="Delete Customer"):
+                    if st.button("", icon=":material/delete:", key=f"del_cust_{row['id']}", help="Delete Customer"):
                          delete_customer_dialog(row)
             st.divider()    
     else:
@@ -913,16 +913,22 @@ elif menu_selection == "Transaction Log":
                 box-shadow: none !important;
                 min-height: 0px !important;
                 height: auto !important;
-                padding-top: 5px !important;
+                line-height: inherit !important;
             }
             div:has(div#cust-list-header-marker) + div button:hover {
                 color: var(--primary-color) !important;
-                text-decoration: underline !important;
+                text-decoration: none !important;
+                background: transparent !important;
             }
             div:has(div#cust-list-header-marker) + div button:focus {
                 color: var(--primary-color) !important;
                 border: none !important;
                 box-shadow: none !important;
+                outline: none !important;
+            }
+            div:has(div#cust-list-header-marker) + div button:active {
+                background: transparent !important;
+                border: none !important;
             }
 
             /* CSS to hide labels on icon buttons in table rows for mobile compactness */
@@ -1061,10 +1067,10 @@ elif menu_selection == "Transaction Log":
                 with c8:
                     b1, b2 = st.columns(2)
                     with b1:
-                        if st.button("Edit", icon=":material/edit:", key=f"edit_{row['id']}", help="Edit"):
+                        if st.button("", icon=":material/edit:", key=f"edit_{row['id']}", help="Edit"):
                             edit_dialog(row)
                     with b2:
-                        if st.button("Delete", icon=":material/delete:", key=f"del_{row['id']}", help="Delete"):
+                        if st.button("", icon=":material/delete:", key=f"del_{row['id']}", help="Delete"):
                             delete_dialog(row)
                 st.divider()
         
