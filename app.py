@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.7.6 (UI Header Fix)"
+APP_VERSION = "v1.8.0 (Custom Quota Top Up)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -431,15 +431,42 @@ elif menu_selection == "Top Up Quota":
         selected_customer = customer_options[selected_name]
         
         st.divider()
-        st.subheader("Select Package")
         
-        # Package selection
-        package_name = st.selectbox("Choose Package", options=list(PRICING_CONFIG.keys()))
-        package_info = PRICING_CONFIG[package_name]
+        # Choice between Package or Custom
+        topup_mode = st.radio("Top Up Mode", ["Package Selection", "Custom Quantity"], horizontal=True)
         
-        qty = package_info['qty']
-        default_unit_price = package_info['price']
-        
+        qty = 0
+        default_unit_price = 0
+        purchase_note = ""
+
+        if topup_mode == "Package Selection":
+            st.subheader("Select Package")
+            package_name = st.selectbox("Choose Package", options=list(PRICING_CONFIG.keys()))
+            package_info = PRICING_CONFIG[package_name]
+            qty = package_info['qty']
+            default_unit_price = package_info['price']
+            purchase_note = f"Top Up: {package_name}"
+        else:
+            st.subheader("Enter Custom Quantity")
+            qty = st.number_input("Portions", min_value=1, value=12, step=1)
+            
+            # Find the applicable unit price based on tiered pricing
+            # Logic: Find the highest package qty that is <= the custom qty
+            applicable_package = None
+            sorted_packages = sorted(PRICING_CONFIG.values(), key=lambda x: x['qty'], reverse=True)
+            for pkg in sorted_packages:
+                if qty >= pkg['qty']:
+                    applicable_package = pkg
+                    break
+            
+            # If qty is smaller than the smallest package (shouldn't happen with min_value=1)
+            if not applicable_package:
+                applicable_package = PRICING_CONFIG["1 Portion"]
+                
+            default_unit_price = applicable_package['price']
+            purchase_note = f"Top Up Custom: {qty} Portions (Tier: {applicable_package['qty']} Pkgs)"
+            st.caption(f"ℹ️ Unit price following the **{applicable_package['qty']} Portion** tier.")
+
         # Editable Unit Price
         unit_price = st.number_input(
             "Unit Price (IDR)", 
@@ -476,7 +503,7 @@ elif menu_selection == "Top Up Quota":
             current_time = datetime.now().time()
             tx_timestamp = datetime.combine(selected_date, current_time)
             
-            update_quota(int(selected_customer['id']), qty, total_price, f"Top Up: {package_name}", tx_timestamp)
+            update_quota(int(selected_customer['id']), qty, total_price, purchase_note, tx_timestamp)
             st.success(f"Successfully added {qty} portions to {selected_name}'s quota on {selected_date}!")
             st.rerun()
 
