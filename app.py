@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.8.5 (Robust Sync Fix)"
+APP_VERSION = "v1.9.0 (Glassmorphism UI)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -352,9 +352,106 @@ def get_transactions_by_date(selected_date):
 
 # --- 4. UI STRUCTURE ---
 st.set_page_config(page_title="Pian Yi Catering", page_icon="🍱", layout="centered")
-st.title("🍱 Pian Yi Catering - Quota Manager")
 
-# Sidbar Navigation
+# --- CUSTOM CSS THEME (Stripe-Inspired Glassmorphism) ---
+st.markdown("""
+    <style>
+        /* 1. Global Gradient Background */
+        .stApp {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background-attachment: fixed;
+        }
+        
+        /* Dark Mode Override (optional, keeps it readable) */
+        @media (prefers-color-scheme: dark) {
+            .stApp {
+                background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            }
+        }
+
+        /* 2. Glassmorphic Containers for Main Content */
+        div.block-container {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 3rem !important;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            margin-top: 2rem;
+            max-width: 800px;
+        }
+
+        /* Dark Mode Glass */
+        @media (prefers-color-scheme: dark) {
+            div.block-container {
+                background: rgba(0, 0, 0, 0.4);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }
+        }
+
+        /* 3. Modern Inputs (Neumorphic-ish Soft Shadows) */
+        .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div, .stDateInput input {
+            border-radius: 12px !important;
+            border: 1px solid rgba(0,0,0,0.05) !important;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03) !important;
+            transition: all 0.2s ease;
+        }
+        .stTextInput input:focus, .stNumberInput input:focus {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+        }
+
+        /* 4. Primary Button (Gradient Pill) */
+        div.stButton > button[kind="primary"] {
+            background: linear-gradient(90deg, #4f46e5 0%, #6366f1 100%);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-weight: 600;
+            padding: 0.6rem 1.5rem;
+            box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.4);
+            transition: transform 0.1s ease-in-out;
+        }
+        div.stButton > button[kind="primary"]:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+        }
+        div.stButton > button[kind="primary"]:active {
+            transform: translateY(1px);
+        }
+
+        /* 5. Metrics Cards */
+        div[data-testid="stMetric"] {
+            background: rgba(255, 255, 255, 0.5);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        /* 6. Typography */
+        h1, h2, h3 {
+            font-family: 'Inter', sans-serif;
+            letter-spacing: -0.02em;
+        }
+        
+        /* Sticky footer adjustments for glass theme */
+        div[data-testid="stElementContainer"]:has(div#sticky-footer-marker) + div {
+            background: rgba(255, 255, 255, 0.85) !important;
+            backdrop-filter: blur(10px) !important;
+            border-top: 1px solid rgba(0,0,0,0.05) !important;
+        }
+
+        /* Hide Streamlit Branding */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("🍱 Pian Yi Catering")
+
+# Sidebar Navigation
 st.sidebar.title("Navigation")
 menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Refund", "Manage Customers", "Transaction Log", "Daily Recap", "User Guide"])
 st.sidebar.divider()
