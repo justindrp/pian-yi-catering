@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.8.2 (Synced Top Up UI)"
+APP_VERSION = "v1.8.3 (Compact Top Up UI)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -445,7 +445,10 @@ elif menu_selection == "Top Up Quota":
         # Determine which package name should be selected based on current qty
         current_qty = st.session_state['topup_qty']
         current_pkg_name = qty_to_pkg.get(current_qty, "Custom")
-        pkg_index = package_options.index(current_pkg_name)
+        try:
+            pkg_index = package_options.index(current_pkg_name)
+        except ValueError:
+             pkg_index = len(package_options) - 1 # Default to Custom if not found
         
         # 3. Package Selection Dropdown
         def on_pkg_change():
@@ -461,18 +464,21 @@ elif menu_selection == "Top Up Quota":
             on_change=on_pkg_change
         )
         
-        # 4. Quantity Adjustment (Numeric Input)
-        def on_qty_change():
-            st.session_state['topup_qty'] = st.session_state['qty_input']
+        # 4. Quantity and Unit Price Side-by-Side
+        c_qty, c_price = st.columns(2)
+        
+        with c_qty:
+            def on_qty_change():
+                st.session_state['topup_qty'] = st.session_state['qty_input']
 
-        qty = st.number_input(
-            "Final Quantity (Portions)", 
-            min_value=1, 
-            value=st.session_state['topup_qty'], 
-            step=1, 
-            key="qty_input",
-            on_change=on_qty_change
-        )
+            qty = st.number_input(
+                "Quantity (Portions)", 
+                min_value=1, 
+                value=st.session_state['topup_qty'], 
+                step=1, 
+                key="qty_input",
+                on_change=on_qty_change
+            )
 
         # 5. Dynamic Unit Price Logic (Tiered)
         applicable_package = None
@@ -487,25 +493,19 @@ elif menu_selection == "Top Up Quota":
             
         default_unit_price = applicable_package['price']
         
-        # 6. Editable Unit Price
-        unit_price = st.number_input(
-            "Unit Price (IDR)", 
-            min_value=0, 
-            value=default_unit_price, 
-            step=500
-        )
+        with c_price:
+            # 6. Editable Unit Price
+            unit_price = st.number_input(
+                "Unit Price (IDR)", 
+                min_value=0, 
+                value=default_unit_price, 
+                step=500
+            )
         
         total_price = qty * unit_price
         
-        # 7. Display Summary Metrics
+        # 7. Compact Summary
         st.caption(f"ℹ️ Unit price following the **{applicable_package['qty']} Portion** tier.")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info(f"**Total Quantity:** {qty} Portions")
-        with col2:
-            st.info(f"**Final Unit Price:** {unit_price:,.0f} IDR")
-            
         st.metric(label="Total to Pay", value=f"{total_price:,.0f} IDR")
         
         # Purchase Note logic
