@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.7.4 (Header Sorting)"
+APP_VERSION = "v1.7.5 (UI Polish)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -576,12 +576,14 @@ elif menu_selection == "Manage Customers":
         st.divider()
 
         # Header - Clickable sorting
-        h1, h2, h3, h4, h5 = st.columns([0.8, 3, 2, 2, 2.2])
+        # Use columns with specific vertical alignment if supported, or just rely on CSS
+        h1, h2, h3, h4, h5 = st.columns([0.8, 3, 2, 2, 2.2], vertical_alignment="center")
         
         with h1:
             st.markdown("**ID**")
             
         with h2:
+            # Sort Button for Name
             label = "Name" + (" 🔼" if st.session_state['cust_sort_col'] == 'name' and st.session_state['cust_sort_asc'] else " 🔽" if st.session_state['cust_sort_col'] == 'name' else "")
             if st.button(label, key="sort_name", use_container_width=True):
                 if st.session_state['cust_sort_col'] == 'name':
@@ -595,6 +597,7 @@ elif menu_selection == "Manage Customers":
             st.markdown("**Phone**")
             
         with h4:
+            # Sort Button for Quota
             label = "Quota" + (" 🔼" if st.session_state['cust_sort_col'] == 'quota_balance' and st.session_state['cust_sort_asc'] else " 🔽" if st.session_state['cust_sort_col'] == 'quota_balance' else "")
             if st.button(label, key="sort_quota", use_container_width=True):
                 if st.session_state['cust_sort_col'] == 'quota_balance':
@@ -659,6 +662,22 @@ elif menu_selection == "Transaction Log":
                 padding-left: 0.5rem !important;
                 padding-right: 0.5rem !important;
                 min-width: 35px !important;
+            }
+
+            /* Sortable Header Button Styling - Make them look like text */
+            div[data-testid="stColumn"] button[key^="sort_"] {
+                border: none !important;
+                background: transparent !important;
+                color: var(--text-color) !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                font-weight: bold !important;
+                text-align: left !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="stColumn"] button[key^="sort_"]:hover {
+                color: var(--primary-color) !important;
+                text-decoration: underline !important;
             }
 
             /* Internal flex container for centering and gap */
