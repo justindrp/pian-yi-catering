@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.2 (Button Nav)"
+APP_VERSION = "v1.9.3 (Material Icons)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -819,7 +819,8 @@ elif menu_selection == "Manage Customers":
             
         with h2:
             # Sort Button for Name
-            label = "Name" + (" 🔼" if st.session_state['cust_sort_col'] == 'name' and st.session_state['cust_sort_asc'] else " 🔽" if st.session_state['cust_sort_col'] == 'name' else "")
+            icon = " :material/arrow_upward:" if st.session_state['cust_sort_col'] == 'name' and st.session_state['cust_sort_asc'] else " :material/arrow_downward:" if st.session_state['cust_sort_col'] == 'name' else ""
+            label = f"Name{icon}"
             if st.button(label, key="sort_name", use_container_width=True):
                 if st.session_state['cust_sort_col'] == 'name':
                     st.session_state['cust_sort_asc'] = not st.session_state['cust_sort_asc']
@@ -833,7 +834,8 @@ elif menu_selection == "Manage Customers":
             
         with h4:
             # Sort Button for Quota
-            label = "Quota" + (" 🔼" if st.session_state['cust_sort_col'] == 'quota_balance' and st.session_state['cust_sort_asc'] else " 🔽" if st.session_state['cust_sort_col'] == 'quota_balance' else "")
+            icon = " :material/arrow_upward:" if st.session_state['cust_sort_col'] == 'quota_balance' and st.session_state['cust_sort_asc'] else " :material/arrow_downward:" if st.session_state['cust_sort_col'] == 'quota_balance' else ""
+            label = f"Quota{icon}"
             if st.button(label, key="sort_quota", use_container_width=True):
                 if st.session_state['cust_sort_col'] == 'quota_balance':
                     st.session_state['cust_sort_asc'] = not st.session_state['cust_sort_asc']
@@ -858,10 +860,10 @@ elif menu_selection == "Manage Customers":
                 # Use columns for tight button spacing
                 b1, b2 = st.columns(2)
                 with b1:
-                    if st.button("✏️", key=f"edit_cust_{row['id']}", help="Edit Customer"):
+                    if st.button("Edit", icon=":material/edit:", key=f"edit_cust_{row['id']}", help="Edit Customer"):
                          edit_customer_dialog(row)
                 with b2:
-                    if st.button("🗑️", key=f"del_cust_{row['id']}", help="Delete Customer"):
+                    if st.button("Delete", icon=":material/delete:", key=f"del_cust_{row['id']}", help="Delete Customer"):
                          delete_customer_dialog(row)
             st.divider()    
     else:
@@ -921,6 +923,13 @@ elif menu_selection == "Transaction Log":
                 color: var(--primary-color) !important;
                 border: none !important;
                 box-shadow: none !important;
+            }
+
+            /* CSS to hide labels on icon buttons in table rows for mobile compactness */
+            @media (max-width: 768px) {
+                div[data-testid="stColumn"] button p {
+                    display: none !important;
+                }
             }
 
             /* Internal flex container for centering and gap */
@@ -1052,10 +1061,10 @@ elif menu_selection == "Transaction Log":
                 with c8:
                     b1, b2 = st.columns(2)
                     with b1:
-                        if st.button("✏️", key=f"edit_{row['id']}", help="Edit"):
+                        if st.button("Edit", icon=":material/edit:", key=f"edit_{row['id']}", help="Edit"):
                             edit_dialog(row)
                     with b2:
-                        if st.button("🗑️", key=f"del_{row['id']}", help="Delete"):
+                        if st.button("Delete", icon=":material/delete:", key=f"del_{row['id']}", help="Delete"):
                             delete_dialog(row)
                 st.divider()
         
