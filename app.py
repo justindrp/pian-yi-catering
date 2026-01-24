@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.1 (Modern Sidebar)"
+APP_VERSION = "v1.9.2 (Button Nav)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -511,11 +511,36 @@ st.markdown("""
 
 st.title("🍱 Pian Yi Catering")
 
-# Sidebar Navigation
+# Sidebar Navigation (Using on_change for state management)
+# Initialize page state
+if 'current_page' not in st.session_state:
+    st.session_state['current_page'] = "Redeem Meal"
+
+# Custom Navigation Logic
+def nav_to(page_name):
+    st.session_state['current_page'] = page_name
+
 st.sidebar.title("Navigation")
-menu_selection = st.sidebar.radio("Go to", ["Redeem Meal", "Top Up Quota", "Refund", "Manage Customers", "Transaction Log", "Daily Recap", "User Guide"])
+
+# Custom Navigation Buttons (Modern List Look)
+pages = ["Redeem Meal", "Top Up Quota", "Refund", "Manage Customers", "Transaction Log", "Daily Recap", "User Guide"]
+icons = ["🍽️", "💰", "💸", "👥", "📜", "📅", "📘"]
+
+for page, icon in zip(pages, icons):
+    # Determine button style based on active state
+    is_active = st.session_state['current_page'] == page
+    kind = "primary" if is_active else "secondary"
+    
+    # Use full width button
+    if st.sidebar.button(f"{icon} {page}", key=f"nav_{page}", use_container_width=True, type=kind):
+        st.session_state['current_page'] = page
+        st.rerun()
+
 st.sidebar.divider()
 st.sidebar.caption(f"App Version: {APP_VERSION}")
+
+# Set menu_selection from state
+menu_selection = st.session_state['current_page']
 
 # --- A. REDEEM MEAL ---
 if menu_selection == "Redeem Meal":
