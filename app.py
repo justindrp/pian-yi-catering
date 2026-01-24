@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.8.0 (Custom Quota Top Up)"
+APP_VERSION = "v1.8.1 (Unified Top Up UI)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -432,42 +432,36 @@ elif menu_selection == "Top Up Quota":
         
         st.divider()
         
-        # Choice between Package or Custom
-        topup_mode = st.radio("Top Up Mode", ["Package Selection", "Custom Quantity"], horizontal=True)
+        st.subheader("Purchase Details")
         
-        qty = 0
-        default_unit_price = 0
-        purchase_note = ""
+        # 1. Package Selection (Sets initial values)
+        package_name = st.selectbox("Choose Base Package", options=list(PRICING_CONFIG.keys()))
+        package_info = PRICING_CONFIG[package_name]
+        
+        # 2. Quantity Adjustment (using numeric input for + / - functionality)
+        # We use session state to track quantity so it can be updated by the dropdown OR the input
+        if 'topup_qty' not in st.session_state or st.session_state.get('last_pkg') != package_name:
+            st.session_state['topup_qty'] = package_info['qty']
+            st.session_state['last_pkg'] = package_name
 
-        if topup_mode == "Package Selection":
-            st.subheader("Select Package")
-            package_name = st.selectbox("Choose Package", options=list(PRICING_CONFIG.keys()))
-            package_info = PRICING_CONFIG[package_name]
-            qty = package_info['qty']
-            default_unit_price = package_info['price']
-            purchase_note = f"Top Up: {package_name}"
-        else:
-            st.subheader("Enter Custom Quantity")
-            qty = st.number_input("Portions", min_value=1, value=12, step=1)
-            
-            # Find the applicable unit price based on tiered pricing
-            # Logic: Find the highest package qty that is <= the custom qty
-            applicable_package = None
-            sorted_packages = sorted(PRICING_CONFIG.values(), key=lambda x: x['qty'], reverse=True)
-            for pkg in sorted_packages:
-                if qty >= pkg['qty']:
-                    applicable_package = pkg
-                    break
-            
-            # If qty is smaller than the smallest package (shouldn't happen with min_value=1)
-            if not applicable_package:
-                applicable_package = PRICING_CONFIG["1 Portion"]
-                
-            default_unit_price = applicable_package['price']
-            purchase_note = f"Top Up Custom: {qty} Portions (Tier: {applicable_package['qty']} Pkgs)"
-            st.caption(f"ℹ️ Unit price following the **{applicable_package['qty']} Portion** tier.")
+        qty = st.number_input("Final Quantity (Portions)", min_value=1, value=st.session_state['topup_qty'], step=1, key="topup_qty_input")
+        # Sync back to session state
+        st.session_state['topup_qty'] = qty
 
-        # Editable Unit Price
+        # 3. Dynamic Unit Price Logic (Tiered)
+        applicable_package = None
+        sorted_packages = sorted(PRICING_CONFIG.values(), key=lambda x: x['qty'], reverse=True)
+        for pkg in sorted_packages:
+            if qty >= pkg['qty']:
+                applicable_package = pkg
+                break
+        
+        if not applicable_package:
+            applicable_package = PRICING_CONFIG["1 Portion"]
+            
+        default_unit_price = applicable_package['price']
+        
+        # 4. Editable Unit Price
         unit_price = st.number_input(
             "Unit Price (IDR)", 
             min_value=0, 
@@ -477,27 +471,28 @@ elif menu_selection == "Top Up Quota":
         
         total_price = qty * unit_price
         
-        # details
+        # 5. Display Summary Metrics
+        st.caption(f"ℹ️ Unit price following the **{applicable_package['qty']} Portion** tier.")
+        
         col1, col2 = st.columns(2)
         with col1:
-            st.info(f"**Quantity:** {qty} Portions")
+            st.info(f"**Total Quantity:** {qty} Portions")
         with col2:
-            st.info(f"**Unit Price:** {unit_price:,.0f} IDR")
+            st.info(f"**Final Unit Price:** {unit_price:,.0f} IDR")
             
         st.metric(label="Total to Pay", value=f"{total_price:,.0f} IDR")
         
-        
-        # Reuse the same date key if we want the "last selected date" to be global across tabs, 
-        # OR use a different key. The user prompt implies a global preference "defaults to the last user-selected date". 
-        # Let's use the SAME session state key 'redeem_date' (maybe rename to 'global_date' in future) for convenience, 
-        # OR just initialize it similarly. Let's use 'redeem_date' as the shared "Transaction Date" for now or create a new one.
-        # Actually, let's use a shared date because "user-selected date" suggests a workflow context.
+        # Purchase Note logic
+        if qty == package_info['qty']:
+            purchase_note = f"Top Up: {package_name}"
+        else:
+            purchase_note = f"Top Up Custom: {qty} Portions (Base: {package_name})"
         
         # Ensure key exists
         if 'redeem_date' not in st.session_state:
             st.session_state['redeem_date'] = datetime.now().date()
             
-        selected_date = st.date_input("Date", key='redeem_date') # This will sync with Redeem page
+        selected_date = st.date_input("Date", key='redeem_date')
         
         if st.button("Confirm Purchase"):
             current_time = datetime.now().time()
