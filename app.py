@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.5 (Header UI Fix)"
+APP_VERSION = "v1.9.6 (JS Header Fix)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -807,11 +807,8 @@ elif menu_selection == "Manage Customers":
             ascending=st.session_state['cust_sort_asc']
         )
 
-        st.divider()
-
         # Header - Clickable sorting
-        # Marker for CSS targeting
-        st.markdown('<div class="header-marker"></div>', unsafe_allow_html=True)
+        # We use a container to try and isolate context, but primarily we will use JS/CSS injection
         h1, h2, h3, h4, h5 = st.columns([0.8, 3, 2, 2, 2.2], vertical_alignment="center")
         
         with h1:
@@ -819,9 +816,14 @@ elif menu_selection == "Manage Customers":
             
         with h2:
             # Sort Button for Name
-            icon = " :material/arrow_upward:" if st.session_state['cust_sort_col'] == 'name' and st.session_state['cust_sort_asc'] else " :material/arrow_downward:" if st.session_state['cust_sort_col'] == 'name' else ""
-            label = f"Name{icon}"
-            if st.button(label, key="sort_name", use_container_width=True):
+            icon = "arrow_upward" if st.session_state['cust_sort_col'] == 'name' and st.session_state['cust_sort_asc'] else "arrow_downward" if st.session_state['cust_sort_col'] == 'name' else ""
+            # We use an empty label and render the text/icon via help or just rely on the button's content?
+            # Streamlit buttons with icons and text are hard to style.
+            # Let's use standard text labels with arrows
+            label_text = f"Name {'↑' if icon == 'arrow_upward' else '↓' if icon == 'arrow_downward' else ''}"
+            
+            # We use a specific key pattern to target via JS
+            if st.button(label_text, key="sort_btn_name", use_container_width=True):
                 if st.session_state['cust_sort_col'] == 'name':
                     st.session_state['cust_sort_asc'] = not st.session_state['cust_sort_asc']
                 else:
@@ -834,9 +836,10 @@ elif menu_selection == "Manage Customers":
             
         with h4:
             # Sort Button for Quota
-            icon = " :material/arrow_upward:" if st.session_state['cust_sort_col'] == 'quota_balance' and st.session_state['cust_sort_asc'] else " :material/arrow_downward:" if st.session_state['cust_sort_col'] == 'quota_balance' else ""
-            label = f"Quota{icon}"
-            if st.button(label, key="sort_quota", use_container_width=True):
+            icon = "arrow_upward" if st.session_state['cust_sort_col'] == 'quota_balance' and st.session_state['cust_sort_asc'] else "arrow_downward" if st.session_state['cust_sort_col'] == 'quota_balance' else ""
+            label_text = f"Quota {'↑' if icon == 'arrow_upward' else '↓' if icon == 'arrow_downward' else ''}"
+            
+            if st.button(label_text, key="sort_btn_quota", use_container_width=True):
                 if st.session_state['cust_sort_col'] == 'quota_balance':
                     st.session_state['cust_sort_asc'] = not st.session_state['cust_sort_asc']
                 else:
@@ -846,6 +849,43 @@ elif menu_selection == "Manage Customers":
                 
         with h5:
             st.markdown("**Actions**")
+            
+        # JS Hack to style specific buttons by their content
+        # This script finds buttons containing "Name" or "Quota" in this specific context and strips styles
+        st.markdown("""
+            <script>
+                const buttons = window.parent.document.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.innerText.includes("Name") || btn.innerText.includes("Quota")) {
+                        btn.style.border = 'none';
+                        btn.style.background = 'transparent';
+                        btn.style.boxShadow = 'none';
+                        btn.style.padding = '0';
+                        btn.style.fontWeight = 'bold';
+                        btn.style.textAlign = 'left';
+                        btn.style.minHeight = '0';
+                        // Remove hover effect listener? Hard. But we can override styles.
+                        btn.addEventListener('mouseover', () => {
+                            btn.style.background = 'transparent';
+                            btn.style.color = '#6366f1'; // Primary color
+                        });
+                        btn.addEventListener('mouseout', () => {
+                            btn.style.background = 'transparent';
+                            btn.style.color = 'inherit';
+                        });
+                    }
+                });
+            </script>
+            <style>
+                /* Fallback CSS for the sort buttons using a data-testid attribute strategy if keys leak to DOM */
+                /* Targeting buttons that are likely our sort headers based on hierarchy */
+                div[data-testid="stHorizontalBlock"] button {
+                     /* This is risky as it hits all buttons in horizontal blocks, but we can try to be specific */
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        st.divider()
             
         st.divider()
         
