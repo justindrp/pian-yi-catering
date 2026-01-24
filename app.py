@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.6 (JS Header Fix)"
+APP_VERSION = "v1.9.7 (CSS Tooltip Target)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -817,13 +817,10 @@ elif menu_selection == "Manage Customers":
         with h2:
             # Sort Button for Name
             icon = "arrow_upward" if st.session_state['cust_sort_col'] == 'name' and st.session_state['cust_sort_asc'] else "arrow_downward" if st.session_state['cust_sort_col'] == 'name' else ""
-            # We use an empty label and render the text/icon via help or just rely on the button's content?
-            # Streamlit buttons with icons and text are hard to style.
-            # Let's use standard text labels with arrows
             label_text = f"Name {'↑' if icon == 'arrow_upward' else '↓' if icon == 'arrow_downward' else ''}"
             
-            # We use a specific key pattern to target via JS
-            if st.button(label_text, key="sort_btn_name", use_container_width=True):
+            # Key change: Added help tooltip for CSS targeting
+            if st.button(label_text, key="sort_btn_name", use_container_width=True, help="Sort by Name"):
                 if st.session_state['cust_sort_col'] == 'name':
                     st.session_state['cust_sort_asc'] = not st.session_state['cust_sort_asc']
                 else:
@@ -839,7 +836,8 @@ elif menu_selection == "Manage Customers":
             icon = "arrow_upward" if st.session_state['cust_sort_col'] == 'quota_balance' and st.session_state['cust_sort_asc'] else "arrow_downward" if st.session_state['cust_sort_col'] == 'quota_balance' else ""
             label_text = f"Quota {'↑' if icon == 'arrow_upward' else '↓' if icon == 'arrow_downward' else ''}"
             
-            if st.button(label_text, key="sort_btn_quota", use_container_width=True):
+            # Key change: Added help tooltip for CSS targeting
+            if st.button(label_text, key="sort_btn_quota", use_container_width=True, help="Sort by Quota"):
                 if st.session_state['cust_sort_col'] == 'quota_balance':
                     st.session_state['cust_sort_asc'] = not st.session_state['cust_sort_asc']
                 else:
@@ -850,38 +848,30 @@ elif menu_selection == "Manage Customers":
         with h5:
             st.markdown("**Actions**")
             
-        # JS Hack to style specific buttons by their content
-        # This script finds buttons containing "Name" or "Quota" in this specific context and strips styles
+        # CSS to target specific buttons by their tooltip (title/aria-label)
+        # This is the most reliable way to target specific buttons in Streamlit
         st.markdown("""
-            <script>
-                const buttons = window.parent.document.querySelectorAll('button');
-                buttons.forEach(btn => {
-                    if (btn.innerText.includes("Name") || btn.innerText.includes("Quota")) {
-                        btn.style.border = 'none';
-                        btn.style.background = 'transparent';
-                        btn.style.boxShadow = 'none';
-                        btn.style.padding = '0';
-                        btn.style.fontWeight = 'bold';
-                        btn.style.textAlign = 'left';
-                        btn.style.minHeight = '0';
-                        // Remove hover effect listener? Hard. But we can override styles.
-                        btn.addEventListener('mouseover', () => {
-                            btn.style.background = 'transparent';
-                            btn.style.color = '#6366f1'; // Primary color
-                        });
-                        btn.addEventListener('mouseout', () => {
-                            btn.style.background = 'transparent';
-                            btn.style.color = 'inherit';
-                        });
-                    }
-                });
-            </script>
             <style>
-                /* Fallback CSS for the sort buttons using a data-testid attribute strategy if keys leak to DOM */
-                /* Targeting buttons that are likely our sort headers based on hierarchy */
-                div[data-testid="stHorizontalBlock"] button {
-                     /* This is risky as it hits all buttons in horizontal blocks, but we can try to be specific */
+                button[title="Sort by Name"], button[title="Sort by Quota"] {
+                    border: 0px solid transparent !important;
+                    background-color: transparent !important;
+                    background: transparent !important;
+                    color: var(--text-color) !important;
+                    padding: 0px !important;
+                    box-shadow: none !important;
                 }
+                button[title="Sort by Name"]:hover, button[title="Sort by Quota"]:hover {
+                    color: var(--primary-color) !important;
+                    background-color: transparent !important;
+                }
+                button[title="Sort by Name"]:focus, button[title="Sort by Quota"]:focus,
+                button[title="Sort by Name"]:active, button[title="Sort by Quota"]:active {
+                    box-shadow: none !important;
+                    outline: none !important;
+                    border: none !important;
+                    background-color: transparent !important;
+                }
+                /* Hide the tooltip itself if possible? No, but that's fine. */
             </style>
         """, unsafe_allow_html=True)
         
