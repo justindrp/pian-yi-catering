@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.7.3 (Customer Search & Sort)"
+APP_VERSION = "v1.7.4 (Header Sorting)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -551,12 +551,14 @@ elif menu_selection == "Manage Customers":
     st.subheader("Customer List")
     customers_df = get_all_customers()
     if not customers_df.empty:
-        # --- Search and Sort Controls ---
-        col_search, col_sort = st.columns([2, 1])
-        with col_search:
-            search_query = st.text_input("🔍 Search Name or Phone", placeholder="Type to filter...")
-        with col_sort:
-            sort_order = st.selectbox("Sort By", ["Name (A-Z)", "Name (Z-A)", "Quota (High-Low)", "Quota (Low-High)"])
+        # Initialize Sort State
+        if 'cust_sort_col' not in st.session_state:
+            st.session_state['cust_sort_col'] = 'name'
+        if 'cust_sort_asc' not in st.session_state:
+            st.session_state['cust_sort_asc'] = True
+
+        # --- Search Control ---
+        search_query = st.text_input("🔍 Search Name or Phone", placeholder="Type to filter...")
 
         # Apply Search
         if search_query:
@@ -565,25 +567,46 @@ elif menu_selection == "Manage Customers":
                 customers_df['phone'].str.contains(search_query, case=False, na=False)
             ]
 
-        # Apply Sorting
-        if sort_order == "Name (A-Z)":
-            customers_df = customers_df.sort_values('name', ascending=True)
-        elif sort_order == "Name (Z-A)":
-            customers_df = customers_df.sort_values('name', ascending=False)
-        elif sort_order == "Quota (High-Low)":
-            customers_df = customers_df.sort_values('quota_balance', ascending=False)
-        elif sort_order == "Quota (Low-High)":
-            customers_df = customers_df.sort_values('quota_balance', ascending=True)
+        # Apply Sorting from Session State
+        customers_df = customers_df.sort_values(
+            st.session_state['cust_sort_col'], 
+            ascending=st.session_state['cust_sort_asc']
+        )
 
         st.divider()
 
-        # Header - Adjusted weights for mobile actions
+        # Header - Clickable sorting
         h1, h2, h3, h4, h5 = st.columns([0.8, 3, 2, 2, 2.2])
-        h1.markdown("**ID**")
-        h2.markdown("**Name**")
-        h3.markdown("**Phone**")
-        h4.markdown("**Quota**")
-        h5.markdown("**Actions**")
+        
+        with h1:
+            st.markdown("**ID**")
+            
+        with h2:
+            label = "Name" + (" 🔼" if st.session_state['cust_sort_col'] == 'name' and st.session_state['cust_sort_asc'] else " 🔽" if st.session_state['cust_sort_col'] == 'name' else "")
+            if st.button(label, key="sort_name", use_container_width=True):
+                if st.session_state['cust_sort_col'] == 'name':
+                    st.session_state['cust_sort_asc'] = not st.session_state['cust_sort_asc']
+                else:
+                    st.session_state['cust_sort_col'] = 'name'
+                    st.session_state['cust_sort_asc'] = True
+                st.rerun()
+                
+        with h3:
+            st.markdown("**Phone**")
+            
+        with h4:
+            label = "Quota" + (" 🔼" if st.session_state['cust_sort_col'] == 'quota_balance' and st.session_state['cust_sort_asc'] else " 🔽" if st.session_state['cust_sort_col'] == 'quota_balance' else "")
+            if st.button(label, key="sort_quota", use_container_width=True):
+                if st.session_state['cust_sort_col'] == 'quota_balance':
+                    st.session_state['cust_sort_asc'] = not st.session_state['cust_sort_asc']
+                else:
+                    st.session_state['cust_sort_col'] = 'quota_balance'
+                    st.session_state['cust_sort_asc'] = True
+                st.rerun()
+                
+        with h5:
+            st.markdown("**Actions**")
+            
         st.divider()
         
         for _, row in customers_df.iterrows():
