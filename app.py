@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.4 (UI Refinement)"
+APP_VERSION = "v1.9.5 (Header UI Fix)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -811,7 +811,7 @@ elif menu_selection == "Manage Customers":
 
         # Header - Clickable sorting
         # Marker for CSS targeting
-        st.markdown('<div id="cust-list-header-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="header-marker"></div>', unsafe_allow_html=True)
         h1, h2, h3, h4, h5 = st.columns([0.8, 3, 2, 2, 2.2], vertical_alignment="center")
         
         with h1:
@@ -901,34 +901,46 @@ elif menu_selection == "Transaction Log":
                 min-width: 35px !important;
             }
 
-            /* Sortable Header Button Styling - Targeted via Marker */
-            div:has(div#cust-list-header-marker) + div button {
-                border: none !important;
+            /* NUCLEAR OPTION for Header Buttons */
+            /* Target buttons that are direct siblings or children of the header marker structure */
+            div:has(div.header-marker) + div button,
+            div:has(div.header-marker) + div + div button,
+            div:has(div.header-marker) + div + div + div button,
+            div:has(div.header-marker) + div + div + div + div button { 
+                border: 0px solid transparent !important;
+                background-color: transparent !important;
                 background: transparent !important;
                 color: var(--text-color) !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                font-weight: bold !important;
-                text-align: left !important;
-                box-shadow: none !important;
-                min-height: 0px !important;
-                height: auto !important;
-                line-height: inherit !important;
-            }
-            div:has(div#cust-list-header-marker) + div button:hover {
-                color: var(--primary-color) !important;
-                text-decoration: none !important;
-                background: transparent !important;
-            }
-            div:has(div#cust-list-header-marker) + div button:focus {
-                color: var(--primary-color) !important;
-                border: none !important;
+                padding: 0px !important;
+                margin: 0px !important;
                 box-shadow: none !important;
                 outline: none !important;
+                min-height: auto !important;
+                height: auto !important;
+                line-height: 1.5 !important;
+                display: inline-block !important;
+                width: auto !important;
             }
-            div:has(div#cust-list-header-marker) + div button:active {
-                background: transparent !important;
+
+            /* Remove hover effects */
+            div:has(div.header-marker) + div button:hover,
+            div:has(div.header-marker) + div + div button:hover,
+            div:has(div.header-marker) + div + div + div button:hover,
+            div:has(div.header-marker) + div + div + div + div button:hover {
+                background-color: transparent !important;
+                color: var(--primary-color) !important;
+                box-shadow: none !important;
                 border: none !important;
+            }
+
+            /* Remove focus/active borders */
+            div:has(div.header-marker) + div button:focus,
+            div:has(div.header-marker) + div button:active,
+            div:has(div.header-marker) + div button:focus-visible {
+                box-shadow: none !important;
+                outline: none !important;
+                border: none !important;
+                background-color: transparent !important;
             }
 
             /* CSS to hide labels on icon buttons in table rows for mobile compactness */
