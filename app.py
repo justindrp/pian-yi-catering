@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.8.3 (Compact Top Up UI)"
+APP_VERSION = "v1.8.4 (Fixed Top Up Sync)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -434,43 +434,57 @@ elif menu_selection == "Top Up Quota":
         
         st.subheader("Purchase Details")
         
-        # 1. Map quantities to package names for syncing
-        qty_to_pkg = {v['qty']: k for k, v in PRICING_CONFIG.items()}
-        package_options = list(PRICING_CONFIG.keys()) + ["Custom"]
-        
-        # 2. Session State Initialization for syncing
+        # --- ROBUST SYNC LOGIC ---
+        # 1. Initialize State
         if 'topup_qty' not in st.session_state:
             st.session_state['topup_qty'] = PRICING_CONFIG["10 Portions"]["qty"]
-        
-        # Determine which package name should be selected based on current qty
-        current_qty = st.session_state['topup_qty']
-        current_pkg_name = qty_to_pkg.get(current_qty, "Custom")
-        try:
-            pkg_index = package_options.index(current_pkg_name)
-        except ValueError:
-             pkg_index = len(package_options) - 1 # Default to Custom if not found
-        
-        # 3. Package Selection Dropdown
-        def on_pkg_change():
-            selected_pkg = st.session_state['pkg_selector']
-            if selected_pkg != "Custom":
-                st.session_state['topup_qty'] = PRICING_CONFIG[selected_pkg]['qty']
 
+        # 2. Define Options & Mapping
+        # Sort options nicely: Smallest to Largest or vice-versa? 
+        # Config is defined 1->80. Let's keep that order.
+        package_options = list(PRICING_CONFIG.keys()) + ["Custom"]
+        qty_to_pkg_name = {v['qty']: k for k, v in PRICING_CONFIG.items()}
+        
+        # 3. Calculate Current Dropdown Index based on State
+        current_qty = st.session_state['topup_qty']
+        
+        # If the current quantity matches a known package, select it. Otherwise "Custom".
+        if current_qty in qty_to_pkg_name:
+            target_pkg_name = qty_to_pkg_name[current_qty]
+        else:
+            target_pkg_name = "Custom"
+            
+        try:
+            current_index = package_options.index(target_pkg_name)
+        except ValueError:
+            current_index = len(package_options) - 1 # Default to Custom
+
+        # 4. Callback for Dropdown
+        def on_pkg_change():
+            new_pkg = st.session_state.pkg_selector
+            if new_pkg != "Custom":
+                # Update the main state quantity
+                st.session_state.topup_qty = PRICING_CONFIG[new_pkg]['qty']
+            # If Custom is selected explicitly, we don't change quantity (user will edit it)
+
+        # 5. Render Dropdown
         selected_package = st.selectbox(
             "Choose Package", 
             options=package_options, 
-            index=pkg_index,
+            index=current_index,
             key="pkg_selector",
             on_change=on_pkg_change
         )
         
-        # 4. Quantity and Unit Price Side-by-Side
+        # 6. Callback for Number Input
+        def on_qty_change():
+            # Update main state from input
+            st.session_state.topup_qty = st.session_state.qty_input
+
+        # 7. Render Number Input
         c_qty, c_price = st.columns(2)
         
         with c_qty:
-            def on_qty_change():
-                st.session_state['topup_qty'] = st.session_state['qty_input']
-
             qty = st.number_input(
                 "Quantity (Portions)", 
                 min_value=1, 
@@ -480,8 +494,9 @@ elif menu_selection == "Top Up Quota":
                 on_change=on_qty_change
             )
 
-        # 5. Dynamic Unit Price Logic (Tiered)
+        # 8. Pricing Logic (Standard Tiered)
         applicable_package = None
+        # Sort desc to find highest tier <= qty
         sorted_packages = sorted(PRICING_CONFIG.values(), key=lambda x: x['qty'], reverse=True)
         for pkg in sorted_packages:
             if qty >= pkg['qty']:
@@ -494,7 +509,6 @@ elif menu_selection == "Top Up Quota":
         default_unit_price = applicable_package['price']
         
         with c_price:
-            # 6. Editable Unit Price
             unit_price = st.number_input(
                 "Unit Price (IDR)", 
                 min_value=0, 
@@ -504,13 +518,13 @@ elif menu_selection == "Top Up Quota":
         
         total_price = qty * unit_price
         
-        # 7. Compact Summary
+        # 9. Summary
         st.caption(f"ℹ️ Unit price following the **{applicable_package['qty']} Portion** tier.")
         st.metric(label="Total to Pay", value=f"{total_price:,.0f} IDR")
         
         # Purchase Note logic
-        if qty in qty_to_pkg:
-            purchase_note = f"Top Up: {qty_to_pkg[qty]}"
+        if qty in qty_to_pkg_name:
+            purchase_note = f"Top Up: {qty_to_pkg_name[qty]}"
         else:
             purchase_note = f"Top Up Custom: {qty} Portions"
         
