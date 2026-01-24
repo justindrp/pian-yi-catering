@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.8.1 (Unified Top Up UI)"
+APP_VERSION = "v1.8.2 (Synced Top Up UI)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -434,21 +434,47 @@ elif menu_selection == "Top Up Quota":
         
         st.subheader("Purchase Details")
         
-        # 1. Package Selection (Sets initial values)
-        package_name = st.selectbox("Choose Base Package", options=list(PRICING_CONFIG.keys()))
-        package_info = PRICING_CONFIG[package_name]
+        # 1. Map quantities to package names for syncing
+        qty_to_pkg = {v['qty']: k for k, v in PRICING_CONFIG.items()}
+        package_options = list(PRICING_CONFIG.keys()) + ["Custom"]
         
-        # 2. Quantity Adjustment (using numeric input for + / - functionality)
-        # We use session state to track quantity so it can be updated by the dropdown OR the input
-        if 'topup_qty' not in st.session_state or st.session_state.get('last_pkg') != package_name:
-            st.session_state['topup_qty'] = package_info['qty']
-            st.session_state['last_pkg'] = package_name
+        # 2. Session State Initialization for syncing
+        if 'topup_qty' not in st.session_state:
+            st.session_state['topup_qty'] = PRICING_CONFIG["10 Portions"]["qty"]
+        
+        # Determine which package name should be selected based on current qty
+        current_qty = st.session_state['topup_qty']
+        current_pkg_name = qty_to_pkg.get(current_qty, "Custom")
+        pkg_index = package_options.index(current_pkg_name)
+        
+        # 3. Package Selection Dropdown
+        def on_pkg_change():
+            selected_pkg = st.session_state['pkg_selector']
+            if selected_pkg != "Custom":
+                st.session_state['topup_qty'] = PRICING_CONFIG[selected_pkg]['qty']
 
-        qty = st.number_input("Final Quantity (Portions)", min_value=1, value=st.session_state['topup_qty'], step=1, key="topup_qty_input")
-        # Sync back to session state
-        st.session_state['topup_qty'] = qty
+        selected_package = st.selectbox(
+            "Choose Package", 
+            options=package_options, 
+            index=pkg_index,
+            key="pkg_selector",
+            on_change=on_pkg_change
+        )
+        
+        # 4. Quantity Adjustment (Numeric Input)
+        def on_qty_change():
+            st.session_state['topup_qty'] = st.session_state['qty_input']
 
-        # 3. Dynamic Unit Price Logic (Tiered)
+        qty = st.number_input(
+            "Final Quantity (Portions)", 
+            min_value=1, 
+            value=st.session_state['topup_qty'], 
+            step=1, 
+            key="qty_input",
+            on_change=on_qty_change
+        )
+
+        # 5. Dynamic Unit Price Logic (Tiered)
         applicable_package = None
         sorted_packages = sorted(PRICING_CONFIG.values(), key=lambda x: x['qty'], reverse=True)
         for pkg in sorted_packages:
@@ -461,7 +487,7 @@ elif menu_selection == "Top Up Quota":
             
         default_unit_price = applicable_package['price']
         
-        # 4. Editable Unit Price
+        # 6. Editable Unit Price
         unit_price = st.number_input(
             "Unit Price (IDR)", 
             min_value=0, 
@@ -471,7 +497,7 @@ elif menu_selection == "Top Up Quota":
         
         total_price = qty * unit_price
         
-        # 5. Display Summary Metrics
+        # 7. Display Summary Metrics
         st.caption(f"ℹ️ Unit price following the **{applicable_package['qty']} Portion** tier.")
         
         col1, col2 = st.columns(2)
@@ -483,10 +509,10 @@ elif menu_selection == "Top Up Quota":
         st.metric(label="Total to Pay", value=f"{total_price:,.0f} IDR")
         
         # Purchase Note logic
-        if qty == package_info['qty']:
-            purchase_note = f"Top Up: {package_name}"
+        if qty in qty_to_pkg:
+            purchase_note = f"Top Up: {qty_to_pkg[qty]}"
         else:
-            purchase_note = f"Top Up Custom: {qty} Portions (Base: {package_name})"
+            purchase_note = f"Top Up Custom: {qty} Portions"
         
         # Ensure key exists
         if 'redeem_date' not in st.session_state:
