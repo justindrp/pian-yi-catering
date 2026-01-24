@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.8.4 (Fixed Top Up Sync)"
+APP_VERSION = "v1.8.5 (Robust Sync Fix)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -434,67 +434,57 @@ elif menu_selection == "Top Up Quota":
         
         st.subheader("Purchase Details")
         
-        # --- ROBUST SYNC LOGIC ---
-        # 1. Initialize State
+        # --- ROBUST SYNC LOGIC (State-Driven) ---
+        # 1. Initialize Master State
         if 'topup_qty' not in st.session_state:
             st.session_state['topup_qty'] = PRICING_CONFIG["10 Portions"]["qty"]
 
         # 2. Define Options & Mapping
-        # Sort options nicely: Smallest to Largest or vice-versa? 
-        # Config is defined 1->80. Let's keep that order.
         package_options = list(PRICING_CONFIG.keys()) + ["Custom"]
         qty_to_pkg_name = {v['qty']: k for k, v in PRICING_CONFIG.items()}
         
-        # 3. Calculate Current Dropdown Index based on State
+        # 3. Callbacks (Update Master State)
+        def on_pkg_change():
+            new_pkg = st.session_state.pkg_selector
+            if new_pkg != "Custom":
+                st.session_state.topup_qty = PRICING_CONFIG[new_pkg]['qty']
+
+        def on_qty_change():
+            st.session_state.topup_qty = st.session_state.qty_input
+
+        # 4. Sync Widget States to Master State
+        # Determine correct package name based on current master qty
         current_qty = st.session_state['topup_qty']
-        
-        # If the current quantity matches a known package, select it. Otherwise "Custom".
         if current_qty in qty_to_pkg_name:
             target_pkg_name = qty_to_pkg_name[current_qty]
         else:
             target_pkg_name = "Custom"
             
-        try:
-            current_index = package_options.index(target_pkg_name)
-        except ValueError:
-            current_index = len(package_options) - 1 # Default to Custom
-
-        # 4. Callback for Dropdown
-        def on_pkg_change():
-            new_pkg = st.session_state.pkg_selector
-            if new_pkg != "Custom":
-                # Update the main state quantity
-                st.session_state.topup_qty = PRICING_CONFIG[new_pkg]['qty']
-            # If Custom is selected explicitly, we don't change quantity (user will edit it)
+        # Force-update widget keys so they render correctly
+        st.session_state['pkg_selector'] = target_pkg_name
+        st.session_state['qty_input'] = current_qty
 
         # 5. Render Dropdown
         selected_package = st.selectbox(
             "Choose Package", 
-            options=package_options, 
-            index=current_index,
+            options=package_options,
             key="pkg_selector",
             on_change=on_pkg_change
         )
         
-        # 6. Callback for Number Input
-        def on_qty_change():
-            # Update main state from input
-            st.session_state.topup_qty = st.session_state.qty_input
-
-        # 7. Render Number Input
+        # 6. Render Number Input
         c_qty, c_price = st.columns(2)
         
         with c_qty:
             qty = st.number_input(
                 "Quantity (Portions)", 
                 min_value=1, 
-                value=st.session_state['topup_qty'], 
                 step=1, 
                 key="qty_input",
                 on_change=on_qty_change
             )
 
-        # 8. Pricing Logic (Standard Tiered)
+        # 7. Pricing Logic (Standard Tiered)
         applicable_package = None
         # Sort desc to find highest tier <= qty
         sorted_packages = sorted(PRICING_CONFIG.values(), key=lambda x: x['qty'], reverse=True)
@@ -518,7 +508,7 @@ elif menu_selection == "Top Up Quota":
         
         total_price = qty * unit_price
         
-        # 9. Summary
+        # 8. Summary
         st.caption(f"ℹ️ Unit price following the **{applicable_package['qty']} Portion** tier.")
         st.metric(label="Total to Pay", value=f"{total_price:,.0f} IDR")
         
