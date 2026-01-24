@@ -13,7 +13,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.7 (CSS Tooltip Target)"
+APP_VERSION = "v1.9.8 (Remove Extra Divider)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -875,8 +875,6 @@ elif menu_selection == "Manage Customers":
             </style>
         """, unsafe_allow_html=True)
         
-        st.divider()
-            
         st.divider()
         
         for _, row in customers_df.iterrows():
