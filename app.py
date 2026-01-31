@@ -14,7 +14,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.10 (Recap Date Range)"
+APP_VERSION = "v2.0.0 (Batch Redeem)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -75,6 +75,25 @@ def get_customer_balance(customer_id):
     customers_df = get_all_customers()
     row = customers_df[customers_df['id'] == customer_id]
     return int(row.iloc[0]['quota_balance']) if not row.empty else 0
+
+def batch_redeem(redemptions, timestamp):
+    """
+    Process multiple redemptions in a single database transaction.
+    redemptions: list of dicts with {customer_id, meal_type}
+    """
+    with conn.session as session:
+        for r in redemptions:
+            # Insert transaction
+            session.execute(text("""
+                INSERT INTO transactions (customer_id, change_amount, payment_amount, note, timestamp, meal_type)
+                VALUES (:cid, -1, 0, 'Redemption', :ts, :meal)
+            """), {"cid": r["customer_id"], "ts": timestamp, "meal": r["meal_type"]})
+            # Update balance
+            session.execute(text("""
+                UPDATE customers SET quota_balance = quota_balance - 1 WHERE id = :cid
+            """), {"cid": r["customer_id"]})
+        session.commit()
+    st.cache_data.clear()
 
 @st.cache_data
 def get_paginated_transactions(limit, offset):
@@ -539,7 +558,7 @@ st.sidebar.caption(f"App Version: {APP_VERSION}")
 # Set menu_selection from state
 menu_selection = st.session_state['current_page']
 
-# --- A. REDEEM MEAL ---
+# --- A. REDEEM MEAL (Batch Mode) ---
 if menu_selection == "Redeem Meal":
     st.header("🍽️ Redeem Meal")
     
@@ -547,55 +566,159 @@ if menu_selection == "Redeem Meal":
     if customers_df.empty:
         st.warning("No customers found. Please add a customer first.")
     else:
-
-        customer_options = {row['name']: row for _, row in customers_df.iterrows()}
-        selected_name = st.selectbox("Select Customer", options=list(customer_options.keys()))
+        # Filter to only customers with balance > 0
+        eligible_customers = customers_df[customers_df['quota_balance'] > 0]
         
-        # Persistent Date Selection
-        if 'redeem_date' not in st.session_state:
-            st.session_state['redeem_date'] = datetime.now().date()
+        if eligible_customers.empty:
+            st.info("No customers have quota to redeem. Top up some customers first.")
+        else:
+            # --- State Initialization ---
+            if 'redeem_selections' not in st.session_state:
+                st.session_state['redeem_selections'] = {}
+            if 'redeem_meal_types' not in st.session_state:
+                st.session_state['redeem_meal_types'] = {}
+            if 'default_meal_type' not in st.session_state:
+                st.session_state['default_meal_type'] = "Lunch"
+            if 'redeem_date' not in st.session_state:
+                st.session_state['redeem_date'] = datetime.now().date()
             
-        selected_date = st.date_input("Date", key='redeem_date')
-        
-        if selected_name:
-            customer_data = customer_options[selected_name]
-            current_balance = customer_data['quota_balance']
+            # --- Header Controls ---
+            col_date, col_default_meal = st.columns([1, 1])
+            with col_date:
+                selected_date = st.date_input("Date", key='redeem_date')
+            with col_default_meal:
+                default_meal = st.selectbox(
+                    "Default Meal Type", 
+                    ["Lunch", "Dinner"], 
+                    index=0 if st.session_state['default_meal_type'] == "Lunch" else 1,
+                    key="default_meal_selector"
+                )
+                st.session_state['default_meal_type'] = default_meal
             
-            # Display Balance
-            st.metric(label="Current Quota Balance", value=f"{current_balance} Portions")
-            
-            # Meal Type Selection
-            meal_type = st.radio("Meal Type", ["Lunch", "Dinner"], horizontal=True)
-            
-            if st.button("Redeem 1 Portion", type="primary"):
-                # Combine selected date with current time for precise logging
-                current_time = datetime.now().time()
-                tx_timestamp = datetime.combine(selected_date, current_time)
-                
-                # Check balance at that specific moment
-                historical_balance = get_balance_at_timestamp(int(customer_data['id']), tx_timestamp)
-                
-                if historical_balance > 0:
-                    update_quota(int(customer_data['id']), -1, 0, "Redemption", tx_timestamp, meal_type)
-                    # Store last redemption for Undo
-                    st.session_state['last_redemption'] = {
-                        'customer_id': int(customer_data['id']),
-                        'name': selected_name
-                    }
-                    st.success(f"Redeemed 1 {meal_type} portion for {selected_name} on {selected_date}!")
+            # --- Bulk Selection Buttons ---
+            col_sel, col_desel, col_spacer = st.columns([1, 1, 2])
+            with col_sel:
+                if st.button("Select All", use_container_width=True):
+                    for _, row in eligible_customers.iterrows():
+                        cid = int(row['id'])
+                        st.session_state['redeem_selections'][cid] = True
+                        if cid not in st.session_state['redeem_meal_types']:
+                            st.session_state['redeem_meal_types'][cid] = st.session_state['default_meal_type']
                     st.rerun()
-                else:
-                    st.error(f"Insufficient balance! On {selected_date}, the balance was {historical_balance}. Cannot redeem.")
-
-        # Undo Functionality
-        if 'last_redemption' in st.session_state:
-            last_red = st.session_state['last_redemption']
-            st.warning(f"Last Action: Redeemed 1 portion for {last_red['name']}")
-            if st.button("↩️ Undo Last Redemption"):
-                update_quota(last_red['customer_id'], 1, 0, "Undo Redemption")
-                del st.session_state['last_redemption']
-                st.info("Redemption undone.")
-                st.rerun()
+            with col_desel:
+                if st.button("Deselect All", use_container_width=True):
+                    st.session_state['redeem_selections'] = {}
+                    st.rerun()
+            
+            st.divider()
+            
+            # --- Customer List with Checkboxes ---
+            # Header row
+            h1, h2, h3, h4 = st.columns([0.5, 2, 1.2, 1.8])
+            h1.markdown("**✓**")
+            h2.markdown("**Customer**")
+            h3.markdown("**Balance**")
+            h4.markdown("**Meal**")
+            
+            for _, row in eligible_customers.iterrows():
+                cid = int(row['id'])
+                cname = row['name']
+                balance = int(row['quota_balance'])
+                
+                # Initialize meal type for this customer if not set
+                if cid not in st.session_state['redeem_meal_types']:
+                    st.session_state['redeem_meal_types'][cid] = st.session_state['default_meal_type']
+                
+                c1, c2, c3, c4 = st.columns([0.5, 2, 1.2, 1.8])
+                
+                with c1:
+                    is_selected = st.checkbox(
+                        "", 
+                        value=st.session_state['redeem_selections'].get(cid, False),
+                        key=f"sel_{cid}",
+                        label_visibility="collapsed"
+                    )
+                    st.session_state['redeem_selections'][cid] = is_selected
+                
+                with c2:
+                    st.write(cname)
+                
+                with c3:
+                    st.write(f"{balance}")
+                
+                with c4:
+                    meal = st.radio(
+                        "",
+                        ["Lunch", "Dinner"],
+                        index=0 if st.session_state['redeem_meal_types'].get(cid, "Lunch") == "Lunch" else 1,
+                        key=f"meal_{cid}",
+                        horizontal=True,
+                        label_visibility="collapsed"
+                    )
+                    st.session_state['redeem_meal_types'][cid] = meal
+            
+            st.divider()
+            
+            # --- Summary and Action ---
+            selected_ids = [cid for cid, sel in st.session_state['redeem_selections'].items() if sel]
+            num_selected = len(selected_ids)
+            
+            if num_selected > 0:
+                # Count lunch vs dinner
+                lunch_count = sum(1 for cid in selected_ids if st.session_state['redeem_meal_types'].get(cid) == "Lunch")
+                dinner_count = num_selected - lunch_count
+                
+                st.info(f"**{num_selected} customer(s) selected:** {lunch_count} Lunch, {dinner_count} Dinner")
+                
+                if st.button(f"Redeem {num_selected} Portion(s)", type="primary", use_container_width=True):
+                    # Build redemption list
+                    redemptions = []
+                    errors = []
+                    
+                    for cid in selected_ids:
+                        # Check balance before adding
+                        current_balance = get_customer_balance(cid)
+                        if current_balance > 0:
+                            redemptions.append({
+                                "customer_id": cid,
+                                "meal_type": st.session_state['redeem_meal_types'].get(cid, "Lunch")
+                            })
+                        else:
+                            # Find customer name for error message
+                            cust_row = eligible_customers[eligible_customers['id'] == cid]
+                            if not cust_row.empty:
+                                errors.append(cust_row.iloc[0]['name'])
+                    
+                    if redemptions:
+                        # Execute batch redemption
+                        current_time = datetime.now().time()
+                        tx_timestamp = datetime.combine(selected_date, current_time)
+                        batch_redeem(redemptions, tx_timestamp)
+                        
+                        # Store for potential undo (simplified: just count)
+                        st.session_state['last_batch_redemption'] = {
+                            'count': len(redemptions),
+                            'date': selected_date
+                        }
+                        
+                        # Clear selections
+                        st.session_state['redeem_selections'] = {}
+                        
+                        st.success(f"Successfully redeemed {len(redemptions)} portion(s) on {selected_date}!")
+                        
+                        if errors:
+                            st.warning(f"Skipped (insufficient balance): {', '.join(errors)}")
+                        
+                        st.rerun()
+                    else:
+                        st.error("No valid redemptions. All selected customers have insufficient balance.")
+            else:
+                st.caption("Select customers above to redeem their meal portions.")
+            
+            # Show last batch info
+            if 'last_batch_redemption' in st.session_state:
+                last_batch = st.session_state['last_batch_redemption']
+                st.caption(f"Last batch: {last_batch['count']} redemption(s) on {last_batch['date']}")
 
 # --- B. TOP UP QUOTA ---
 elif menu_selection == "Top Up Quota":
@@ -1106,12 +1229,13 @@ elif menu_selection == "User Guide":
     st.header("📘 User Guide")
     
     st.markdown("""
-    ### 1. Redeem Meal 🍽️
-    - Go to **Redeem Meal**.
-    - Select the customer's name.
-    - Choose **Lunch** or **Dinner**.
-    - Click **"Redeem 1 Portion"**.
-    - **Mistake?** If you clicked by accident, an **"Undo Last Redemption"** button will appear. Click it immediately to reverse the change.
+    ### 1. Redeem Meal 🍽️ (Batch Mode)
+    - Go to **Redeem Meal** to see all customers with available quota.
+    - **Select customers:** Check the boxes next to customers who are redeeming today.
+    - **Set meal type:** Each customer has Lunch/Dinner radio buttons. Use "Default Meal Type" to set bulk defaults.
+    - **Bulk actions:** Use "Select All" / "Deselect All" buttons for quick selection.
+    - Click **"Redeem X Portion(s)"** to process all selected customers at once.
+    - The summary shows how many Lunch vs Dinner redemptions are queued.
     
     ### 2. Top Up Quota 💰
     - Go to **Top Up Quota**.
