@@ -1,3 +1,4 @@
+import math
 import streamlit as st
 import pandas as pd
 from sqlalchemy import text
@@ -13,7 +14,7 @@ PRICING_CONFIG = {
     "40 Portions": {"qty": 40, "price": 24000},
     "80 Portions": {"qty": 80, "price": 23000},
 }
-APP_VERSION = "v1.9.8 (Remove Extra Divider)"
+APP_VERSION = "v1.9.10 (Recap Date Range)"
 
 # --- 2. DATABASE CONNECTION & INIT ---
 # Assumes [connections.supabase] is set in .streamlit/secrets.toml
@@ -68,6 +69,12 @@ except Exception as e:
 @st.cache_data
 def get_all_customers():
     return conn.query("SELECT * FROM customers ORDER BY name ASC", ttl=0)
+
+def get_customer_balance(customer_id):
+    """Return quota_balance for customer_id, or 0 if not found."""
+    customers_df = get_all_customers()
+    row = customers_df[customers_df['id'] == customer_id]
+    return int(row.iloc[0]['quota_balance']) if not row.empty else 0
 
 @st.cache_data
 def get_paginated_transactions(limit, offset):
@@ -189,17 +196,13 @@ def edit_dialog(tx_row):
         cid = int(tx_row['customer_id'])
         
         # Fetch current balance to check for negative result
-        customers_df = get_all_customers()
-        customer_row = customers_df[customers_df['id'] == cid]
-        
-        if not customer_row.empty:
-            current_balance = int(customer_row.iloc[0]['quota_balance'])
-            diff = int(new_change) - int(tx_row['change_amount'])
-            resulting_balance = current_balance + diff
-            
-            if resulting_balance < 0:
-                st.error(f"❌ Cannot update! This change would result in a negative quota balance ({resulting_balance} portions).")
-                return
+        current_balance = get_customer_balance(cid)
+        diff = int(new_change) - int(tx_row['change_amount'])
+        resulting_balance = current_balance + diff
+
+        if resulting_balance < 0:
+            st.error(f"❌ Cannot update! This change would result in a negative quota balance ({resulting_balance} portions).")
+            return
 
         # Helper function call
         edit_transaction(
@@ -229,13 +232,10 @@ def delete_dialog(tx_row):
         # Check if deletion would cause negative balance (for Top Ups)
         orig_change = int(tx_row['change_amount'])
         if orig_change > 0:
-            customers_df = get_all_customers()
-            customer_row = customers_df[customers_df['id'] == cid]
-            if not customer_row.empty:
-                current_balance = int(customer_row.iloc[0]['quota_balance'])
-                if (current_balance - orig_change) < 0:
-                    st.error(f"❌ Cannot delete! Deleting this Top Up would result in a negative balance ({current_balance - orig_change}).")
-                    return
+            current_balance = get_customer_balance(cid)
+            if (current_balance - orig_change) < 0:
+                st.error(f"❌ Cannot delete! Deleting this Top Up would result in a negative balance ({current_balance - orig_change}).")
+                return
 
         delete_transaction(
             int(tx_row['id']), 
@@ -338,17 +338,18 @@ def get_balance_at_timestamp(customer_id, target_timestamp):
     return int(result.iloc[0, 0]) if not result.empty else 0
 
 @st.cache_data
-def get_transactions_by_date(selected_date):
+def get_transactions_by_date_range(start_date, end_date):
     # Ensure date filtering works regardless of time
     query = """
     SELECT 
         t.id, t.timestamp, c.name, t.change_amount, t.payment_amount, t.note, t.meal_type 
     FROM transactions t
     JOIN customers c ON t.customer_id = c.id
-    WHERE DATE(t.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') = :selected_date
+    WHERE DATE(t.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') >= :start_date
+      AND DATE(t.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta') <= :end_date
     ORDER BY t.timestamp DESC 
     """
-    return conn.query(query, params={"selected_date": selected_date}, ttl=0)
+    return conn.query(query, params={"start_date": start_date, "end_date": end_date}, ttl=0)
 
 # --- 4. UI STRUCTURE ---
 st.set_page_config(page_title="Pian Yi Catering", page_icon="🍱", layout="centered")
@@ -515,10 +516,6 @@ st.title("🍱 Pian Yi Catering")
 # Initialize page state
 if 'current_page' not in st.session_state:
     st.session_state['current_page'] = "Redeem Meal"
-
-# Custom Navigation Logic
-def nav_to(page_name):
-    st.session_state['current_page'] = page_name
 
 st.sidebar.title("Navigation")
 
@@ -929,48 +926,6 @@ elif menu_selection == "Transaction Log":
                 min-width: 35px !important;
             }
 
-            /* NUCLEAR OPTION for Header Buttons */
-            /* Target buttons that are direct siblings or children of the header marker structure */
-            div:has(div.header-marker) + div button,
-            div:has(div.header-marker) + div + div button,
-            div:has(div.header-marker) + div + div + div button,
-            div:has(div.header-marker) + div + div + div + div button { 
-                border: 0px solid transparent !important;
-                background-color: transparent !important;
-                background: transparent !important;
-                color: var(--text-color) !important;
-                padding: 0px !important;
-                margin: 0px !important;
-                box-shadow: none !important;
-                outline: none !important;
-                min-height: auto !important;
-                height: auto !important;
-                line-height: 1.5 !important;
-                display: inline-block !important;
-                width: auto !important;
-            }
-
-            /* Remove hover effects */
-            div:has(div.header-marker) + div button:hover,
-            div:has(div.header-marker) + div + div button:hover,
-            div:has(div.header-marker) + div + div + div button:hover,
-            div:has(div.header-marker) + div + div + div + div button:hover {
-                background-color: transparent !important;
-                color: var(--primary-color) !important;
-                box-shadow: none !important;
-                border: none !important;
-            }
-
-            /* Remove focus/active borders */
-            div:has(div.header-marker) + div button:focus,
-            div:has(div.header-marker) + div button:active,
-            div:has(div.header-marker) + div button:focus-visible {
-                box-shadow: none !important;
-                outline: none !important;
-                border: none !important;
-                background-color: transparent !important;
-            }
-
             /* CSS to hide labels on icon buttons in table rows for mobile compactness */
             @media (max-width: 768px) {
                 div[data-testid="stColumn"] button p {
@@ -1020,7 +975,6 @@ elif menu_selection == "Transaction Log":
     # 2. Get total count
     total_count = get_total_transaction_count()
     if total_count > 0:
-        import math
         total_pages = math.ceil(total_count / rows_per_page)
         
         # Initialize Page State
@@ -1037,49 +991,8 @@ elif menu_selection == "Transaction Log":
         offset = (current_page - 1) * rows_per_page
         transactions_df = get_paginated_transactions(rows_per_page, offset)
         
-        # --- STICKY CONTROLS RENDER ---
-        # We use a container that we style via CSS or just place at bottom.
-        # Since standard Streamlit layout can't easily put things outside the flow,
-        # we will render a container and use the .sticky-pagination class concept if possible,
-        # OR we rely on st.columns inside a bottom container.
-        # However, to be truly sticky, we often need to render HTML/JS or use a specific hack.
-        # For simplicity and "native-feel", we will render the buttons at the bottom of the script
-        # but the user *specifically* requested CSS sticky behavior.
-        #
-        # Let's try to inject the sticky container logic.
-        # Actually, Streamlit buttons inside raw HTML don't trigger python callbacks easily.
-        # So we have to use standard st.buttons and maybe just float them?
-        # A simpler robust approach:
-        # Render buttons at top AND bottom? User said "Sticky fixed at very bottom".
-        # 
-        # Standard Streamlit "Sticky" implementation usually involves putting the pagination
-        # in the sidebar or just at the top/bottom. "Fixed at bottom" overlays content.
-        #
-        # Let's try to render the columns for buttons, and give them a class?
-        # Streamlit doesn't allow custom classes on specific widgets easily without extra libs.
-        #
-        # ALTERNATIVE: Use `st.sidebar` for navigation? No, user said "browser window".
-        #
-        # Let's try to use standard columns logic, but render them *last*, 
-        # and maybe standard scrolling is fine? 
-        # Wait, the prompt explicitly asked for Sticky.
-        # I will attempt to render a `st.container` at the end script, 
-        # but Streamlit runs top-to-bottom.
-        #
-        # Re-reading: "Replace + - with < >". "Sticky at bottom".
-        # I'll stick to replacing the logic first. I will render the buttons at the BOTTOM of this section.
-        # To make it "Fixed", I might need to put it in the sidebar or accept it's at the end of the list.
-        # 
-        # Actually, if I put the pagination logic *after* the list loop, it naturally appears at the bottom.
-        # But if the list is long, the user scrolls.
-        # "Sticky" means visible *while* scrolling.
-        # 
-        # Let's try to use a floating bottom container approach if possible, but pure CSS on st.buttons is hard.
-        # I will place the pagination controls at the TOP and BOTTOM for usability, 
-        # OR just at the TOP?
-        # 
-        # Let's follow the "Previous/Next" requirement strictly first.
-        
+        # Pagination: list rendered above; sticky footer via CSS below.
+
         # Display the list
         if not transactions_df.empty:
             # Header - Adjusted weights for mobile actions
@@ -1114,27 +1027,8 @@ elif menu_selection == "Transaction Log":
                             delete_dialog(row)
                 st.divider()
         
-        # --- PAGINATION CONTROLS (At Bottom) ---
-        # 1. Spacer to push content up if needed (handled by CSS padding-bottom)
-        
-        # 2. Render the Sticky Footer Container
-        # To make it sticky, we inject a div that acts as the sticky wrapper, 
-        # and we put the columns INSIDE it.
-        # But st.columns cannot be inside st.markdown.
-        
-        # WORKAROUND: We use a fixed container via st.container() and hope for the best?
-        # No, let's use the 'bottom' container property if available (Streamlit 1.33+), 
-        # but for compatibility, we use the CSS injection + a specific container structure.
-        
-        # Better approach: Just use columns at the bottom and accept they act as normal widgets,
-        # but we INJECT a floating HTML element separately? No, that won't have the buttons.
-        
-        # FINAL APPROACH: Render buttons normally, but assume user sees them at the bottom.
-        # The user's detailed request for "Sticky" is hard to guarantee without `st.components`.
-        # I will inject a JS script to move the last container to the bottom? No, disallowed.
-        
-        # I will use a container and try to target it with CSS ":last-child".
-        
+        # Render transaction rows and sticky pagination footer.
+
     else:
         st.caption("No transactions found.")
 
@@ -1159,46 +1053,53 @@ elif menu_selection == "Transaction Log":
 elif menu_selection == "Daily Recap":
     st.header("📅 Daily Recap")
     
-    selected_date = st.date_input("Select Date", value=datetime.now().date())
+    # Initialize with a range (today to today)
+    today = datetime.now().date()
+    selected_dates = st.date_input("Select Date Range", value=[today, today])
     
-    daily_df = get_transactions_by_date(selected_date)
-    
-    if not daily_df.empty:
-        # Calculate Summaries
-        total_revenue = daily_df[daily_df['payment_amount'] > 0]['payment_amount'].sum()
+    # Check if range is complete
+    if len(selected_dates) == 2:
+        start_date, end_date = selected_dates
+        daily_df = get_transactions_by_date_range(start_date, end_date)
         
-        # Calculate Portions Sold (Top Ups) - Change Amount > 0
-        portions_sold = daily_df[daily_df['change_amount'] > 0]['change_amount'].sum()
-        
-        # Calculate Portions Redeemed - Change Amount < 0
-        redemptions = daily_df[daily_df['change_amount'] < 0]
-        portions_redeemed = abs(redemptions['change_amount'].sum())
-        
-        # Breakdown Lunch vs Dinner
-        lunch_redeemed = abs(redemptions[redemptions['meal_type'] == 'Lunch']['change_amount'].sum())
-        dinner_redeemed = abs(redemptions[redemptions['meal_type'] == 'Dinner']['change_amount'].sum())
-        
-        # Metrics
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total Revenue", f"{total_revenue:,.0f} IDR")
-        m2.metric("Portions Sold", f"{portions_sold}")
-        m3.metric("Lunch", f"{lunch_redeemed}")
-        m4.metric("Dinner", f"{dinner_redeemed}")
-        
-        st.caption(f"Total Redeemed: {portions_redeemed}")
-        
-        st.divider()
-        st.subheader(f"Transactions for {selected_date.strftime('%d %B %Y')}")
-        
-        # Re-use the row-based layout or standard dataframe
-        # Let's use standard dataframe for compactness here since we aren't editing
-        st.dataframe(
-            daily_df[['timestamp', 'name', 'meal_type', 'change_amount', 'payment_amount', 'note']],
-            width="stretch",
-            hide_index=True
-        )
+        if not daily_df.empty:
+            # Calculate Summaries
+            total_revenue = daily_df[daily_df['payment_amount'] > 0]['payment_amount'].sum()
+            
+            # Calculate Portions Sold (Top Ups) - Change Amount > 0
+            portions_sold = daily_df[daily_df['change_amount'] > 0]['change_amount'].sum()
+            
+            # Calculate Portions Redeemed - Change Amount < 0
+            redemptions = daily_df[daily_df['change_amount'] < 0]
+            portions_redeemed = abs(redemptions['change_amount'].sum())
+            
+            # Breakdown Lunch vs Dinner
+            lunch_redeemed = abs(redemptions[redemptions['meal_type'] == 'Lunch']['change_amount'].sum())
+            dinner_redeemed = abs(redemptions[redemptions['meal_type'] == 'Dinner']['change_amount'].sum())
+            
+            # Metrics
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Total Revenue", f"{total_revenue:,.0f} IDR")
+            m2.metric("Portions Sold", f"{portions_sold}")
+            m3.metric("Lunch", f"{lunch_redeemed}")
+            m4.metric("Dinner", f"{dinner_redeemed}")
+            
+            st.caption(f"Total Redeemed: {portions_redeemed}")
+            
+            st.divider()
+            range_str = f"{start_date.strftime('%d %b %Y')} - {end_date.strftime('%d %b %Y')}" if start_date != end_date else start_date.strftime('%d %B %Y')
+            st.subheader(f"Transactions for {range_str}")
+            
+            # Re-use the row-based layout or standard dataframe
+            st.dataframe(
+                daily_df[['timestamp', 'name', 'meal_type', 'change_amount', 'payment_amount', 'note']],
+                width="stretch",
+                hide_index=True
+            )
+        else:
+            st.info(f"No transactions found for the selected period.")
     else:
-        st.info(f"No transactions found for {selected_date.strftime('%d %B %Y')}.")
+        st.info("Please select a range (start and end date) to see the summary.")
 
 # --- F. USER GUIDE ---
 elif menu_selection == "User Guide":
@@ -1233,6 +1134,6 @@ elif menu_selection == "User Guide":
     - **Note:** The `+/-` column shows how many portions were changed.
     
     ### 6. Daily Recap 📊
-    - Select a date to see a summary of that day's performance.
+    - Select a **Date Range** (start and end date) to see a summary of performance over that period.
     - Shows total **Revenue**, **Top Ups**, and a breakdown of **Lunch vs Dinner** redemptions.
     """)
