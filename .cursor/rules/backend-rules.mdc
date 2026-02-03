@@ -1,0 +1,42 @@
+---
+description: FastAPI backend conventions (v2 architecture)
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Role & Context
+Act as a Senior Backend Developer specializing in FastAPI and Python microservices.
+This is the v2 architecture for "Pian Yi Catering" - a SaaS migration from Streamlit.
+
+# Architecture & Tech Stack
+- **Framework:** FastAPI with async/await patterns
+- **Database:** Supabase (PostgreSQL) via `supabase-py` client
+- **Validation:** Pydantic v2 models for request/response schemas
+- **Auth:** Supabase Auth (JWT tokens)
+- **Deployment:** Docker container (future: Railway/Render)
+
+# Code Structure
+```
+backend/
+├── main.py           # FastAPI app entry point
+├── routers/          # API route modules
+├── models/           # Pydantic schemas
+├── services/         # Business logic layer
+├── db/               # Database connection & queries
+└── utils/            # Helpers and utilities
+```
+
+# API Design
+1. **RESTful endpoints** with consistent naming: `/api/v1/customers`, `/api/v1/transactions`
+2. **Response format:** Always return `{"data": ..., "error": null}` or `{"data": null, "error": "..."}`
+3. **Status codes:** 200 (success), 201 (created), 400 (validation), 401 (auth), 404 (not found), 500 (server)
+
+# Database Rules
+1. **Connection:** Use `supabase.create_client(url, key)` from environment variables
+2. **Async:** Prefer async database operations where supported
+3. **Transactions:** Use database transactions for multi-step operations
+
+# Security
+- Never commit `.env` files - use `.env.example` as template
+- Validate all inputs with Pydantic before database operations
+- Use parameterized queries to prevent SQL injection

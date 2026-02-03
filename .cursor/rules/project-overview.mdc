@@ -1,0 +1,38 @@
+---
+description: Project overview and architecture decisions
+alwaysApply: true
+---
+
+# Pian Yi Catering - Project Overview
+
+A quota management system for a catering business, currently undergoing migration from v1 to v2.
+
+## Architecture Versions
+
+### v1 (Legacy - Production)
+- **File:** `app.py` (single-file Streamlit app)
+- **Status:** LIVE on Streamlit Community Cloud
+- **Rule:** Do NOT modify unless explicitly asked
+- **Branch:** `main`
+
+### v2 (Migration - Development)
+- **Backend:** FastAPI in `backend/`
+- **Frontend:** Next.js in `frontend/`
+- **Status:** Under development
+- **Branch:** `v2-architecture`
+
+## Database (Shared)
+- **Provider:** Supabase (PostgreSQL)
+- **Tables:** `customers`, `transactions`
+- **Note:** Both v1 and v2 use the same database
+
+## Key Business Logic
+1. **Pricing tiers** are hardcoded (not in database)
+2. **Quota:** Top-up adds, Redemption subtracts
+3. **Revenue:** Only tracked on Top-up transactions
+
+## Development Workflow
+- Work on `v2-architecture` branch for new architecture
+- Keep `main` branch stable for production Streamlit app
+- Test backend at `http://localhost:8000`
+- Test frontend at `http://localhost:3000`

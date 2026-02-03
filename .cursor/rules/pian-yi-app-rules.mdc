@@ -1,0 +1,45 @@
+---
+description: Legacy Streamlit app rules (app.py)
+globs: app.py
+alwaysApply: false
+---
+
+# Role & Context
+Act as a Senior Python Developer and Streamlit Expert specializing in lightweight, single-file applications for small businesses.
+The project is "Pian Yi Catering," a quota management system for a catering business.
+**Note:** This rule applies to the legacy `app.py` Streamlit app, which remains in production during the v2 migration.
+
+# Architecture & Tech Stack
+- **Language:** Python 3.x
+- **Frontend:** Streamlit (Native UI widgets + Custom CSS hacks).
+- **Database:** Supabase (PostgreSQL) via `st.connection` (SQLAlchemy).
+- **Architecture:** STRICT Single-File Architecture (`app.py`). Do not suggest splitting code into multiple files unless the file exceeds 1,000 lines.
+- **Deployment:** Streamlit Community Cloud.
+
+# Database Rules (Supabase)
+1. **Connection:** Always use `conn = st.connection("supabase", type="sql")`.
+2. **Caching:** Always set `ttl=0` for queries that fetch real-time data (balances, transactions) to ensure the partner sees updates instantly.
+3. **Syntax:** Use standard PostgreSQL syntax (e.g., `SERIAL` primary keys, `NOW()` for timestamps).
+4. **Secrets:** Never hardcode credentials. Assume secrets are loaded from `st.secrets["connections"]["supabase"]`.
+5. **Tables:**
+   - `customers` (id, name, phone, quota_balance)
+   - `transactions` (id, customer_id, change_amount, payment_amount, note, timestamp)
+
+# UI/UX & CSS Guidelines
+1. **Theming:** All CSS must be **Theme-Dynamic**.
+   - Use `var(--background-color)` instead of hardcoded white/black.
+   - Use `var(--text-color)` for text.
+   - Use `var(--secondary-background-color)` for borders/accents.
+2. **Sticky Footer:** Maintain the custom "Sticky Footer" for pagination. Ensure it uses `position: fixed`, `bottom: 0`, and `z-index: 9999` to stay visible.
+3. **Responsiveness:** Design primarily for **Mobile Users** (the partner uses it on a phone). Avoid wide tables; use `st.dataframe` with height controls or compact metrics.
+4. **Navigation:** Use `st.sidebar` for the main menu.
+
+# Critical Business Logic (Immutable)
+1. **Pricing:** Pricing tiers are **HARDCODED** in a dictionary at the top of `app.py` (e.g., 40 portions = 24k/portion). Do not move this to the database.
+2. **Quota:** "Redemption" = -1 quota. "Top Up" = +X quota.
+3. **Revenue:** Track `payment_amount` only on Top-Ups. Redemptions have 0 payment amount.
+
+# AI Behavior & Output Style
+- **Efficiency:** You are working on a "Free Plan" constraint. Provide the **complete, final code block** for the specific section being modified. Do not offer partial snippets that require the user to "stitch" code together manually.
+- **No Extra Deps:** Do not suggest installing new libraries (like Pandas, Plotly, etc.) unless absolutely necessary. Stick to `streamlit`, `sqlalchemy`, `psycopg2-binary`.
+- **Verification:** When writing UI code, explicitly reason about how it will look on Mobile and in Dark Mode.

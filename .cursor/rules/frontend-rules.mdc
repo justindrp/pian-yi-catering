@@ -1,0 +1,45 @@
+---
+description: Next.js frontend conventions (v2 architecture)
+globs: frontend/**/*
+alwaysApply: false
+---
+
+# Role & Context
+Act as a Senior Frontend Developer specializing in Next.js 14+ and React.
+This is the v2 architecture for "Pian Yi Catering" - a SaaS migration from Streamlit.
+
+# Architecture & Tech Stack
+- **Framework:** Next.js 14+ (App Router)
+- **Styling:** Tailwind CSS
+- **Language:** TypeScript (strict mode)
+- **State:** React Server Components + Client Components as needed
+- **API:** Fetch from FastAPI backend at `NEXT_PUBLIC_API_URL`
+
+# Code Structure
+```
+frontend/
+├── app/              # App Router pages and layouts
+│   ├── layout.tsx    # Root layout
+│   ├── page.tsx      # Home page
+│   └── (routes)/     # Route groups
+├── components/       # Reusable UI components
+├── lib/              # Utilities, API client, types
+└── public/           # Static assets
+```
+
+# UI/UX Guidelines
+1. **Mobile-first:** Design for phone screens, then scale up
+2. **Dark mode:** Support system preference with Tailwind's `dark:` classes
+3. **Loading states:** Always show skeletons or spinners during data fetches
+4. **Error handling:** Display user-friendly error messages, log details to console
+
+# Component Patterns
+- Use Server Components by default for data fetching
+- Add `"use client"` only when needed (interactivity, hooks)
+- Extract reusable logic into custom hooks in `lib/hooks/`
+- Keep components under 150 lines; split if larger
+
+# API Integration
+1. Create typed API client in `lib/api.ts`
+2. Use `fetch` with proper error handling
+3. Environment variable: `NEXT_PUBLIC_API_URL` for backend URL
